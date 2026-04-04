@@ -1,0 +1,5 @@
+{
+  "name": "Explow: Digital Future Self",
+  "description": "Meet your possible future selves through AI-driven exploration and visualization.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
