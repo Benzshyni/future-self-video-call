@@ -16,6 +16,10 @@ This project is configured to deploy to **GitHub Pages** automatically when you 
      - Name: `GEMINI_API_KEY`
      - Value: Your Gemini API key.
 
+## Configuration Notes
+
+- **Vite Configuration**: The project is configured with `base: '/future-self-video-call/'` in `vite.config.ts`. If you rename your repository, you must update this value to match your new repository name.
+
 ## Workflows
 
 - **CI**: Runs on every push and pull request to ensure the code passes linting.
