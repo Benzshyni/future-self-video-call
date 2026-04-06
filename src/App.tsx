@@ -1684,7 +1684,7 @@ function AppContent() {
 
     setIsCallActive(true);
     setChatMessages([]);
-    setCallStep(0);
+    setCallStep(-1);
     
     // Ringing sound
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -1755,6 +1755,7 @@ function AppContent() {
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
+          ${futureSelf?.contextualObservation ? `Neural Observation of Past Self: "${futureSelf.contextualObservation}". You should mention this observation naturally in your opening greeting.` : ""}
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
           You are currently in a REAL-TIME VOICE CALL with your past self. 
           Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
@@ -1785,7 +1786,8 @@ function AppContent() {
             // Trigger initial greeting
             sessionPromise.then((session) => {
               liveSessionRef.current = session;
-              session.sendRealtimeInput({ text: "The connection is established. Greet your past self and start the conversation." });
+              const greetingPrompt = `The connection is established. Greet your past self for the first time. ${futureSelf?.contextualObservation ? `Make sure to naturally mention your observation: "${futureSelf.contextualObservation}".` : ""} Start the conversation.`;
+              session.sendRealtimeInput({ text: greetingPrompt });
               // Start sending audio from mic
               startAudioStreaming(session);
             });
