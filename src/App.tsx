@@ -653,6 +653,14 @@ function AppContent() {
   const [videoProgressPercent, setVideoProgressPercent] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
   const isVideoGenerationCancelledRef = useRef(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages]);
+
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
 
@@ -801,10 +809,10 @@ function AppContent() {
     setCallStep(nextStep);
     setIsAITyping(true);
     
-    const history = [...chatHistory];
+    const history = [...chatMessages];
     if (response) {
       history.push({ role: "user", text: response });
-      setChatHistory(history);
+      setChatMessages(history);
       setQuestionsRemaining(prev => prev - 1);
     }
 
@@ -825,13 +833,13 @@ function AppContent() {
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: history.map(m => ({ role: m.role, parts: [{ text: m.text }] })).concat([{ role: "user", parts: [{ text: prompt }] }]),
       });
 
       const aiText = result.text;
       setAiMessage(aiText);
       history.push({ role: "model", text: aiText });
-      setChatHistory(history);
+      setChatMessages(history);
       
       if (profile.responseMode === "voice") {
         handleSpeak(aiText);
@@ -1096,10 +1104,30 @@ function AppContent() {
   const clearSavedData = () => {
     localStorage.removeItem("explow_profile");
     localStorage.removeItem("explow_future_self");
-    setProfile(prev => ({ ...prev, name: "", passion: "", vibe: "", avatarType: "caricature" }));
+    setProfile({
+      name: "",
+      passion: "",
+      vibe: "",
+      futureChoice: "1-year",
+      responseMode: "voice",
+      style: "realistic",
+      avatarType: "caricature"
+    });
     setFutureSelf(null);
-    setHasSavedProfile(false);
+    setChatMessages([]);
+    setChatHistory([]);
+    setChatSession(null);
     setStep("entry");
+    setHasSavedProfile(false);
+    setCallError(null);
+    setQuestionsRemaining(4);
+    setCallStep(0);
+    setAiMessage("");
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      setUserStream(null);
+    }
   };
 
   const onboardingSteps = [
@@ -2137,7 +2165,7 @@ function AppContent() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
-              className="space-y-8"
+              className="flex flex-col items-center gap-6"
             >
               <button
                 onClick={async () => {
@@ -2147,15 +2175,13 @@ function AppContent() {
                     setStep("choose-future");
                   }
                 }}
-                className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                disabled={!profile.name || !profile.passion}
+                className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="relative z-10 flex items-center">
                   {hasApiKey === false ? "Initialize Link" : "Accept Call"} 
                   <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
                 </span>
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                />
               </button>
 
               <div className="flex flex-col items-center gap-4">
@@ -2165,14 +2191,22 @@ function AppContent() {
                   </p>
                 )}
 
-                {hasSavedProfile && (
+                <div className="flex items-center gap-6">
+                  {hasSavedProfile && (
+                    <button
+                      onClick={() => setStep("takeaway")}
+                      className="text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
+                    >
+                      View Previous Reflection
+                    </button>
+                  )}
                   <button
-                    onClick={() => setStep("takeaway")}
-                    className="text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
+                    onClick={clearSavedData}
+                    className="text-red-500/40 hover:text-red-500 transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-red-500/10 pb-1"
                   >
-                    View Previous Reflection
+                    Start Fresh
                   </button>
-                )}
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -2201,7 +2235,6 @@ function AppContent() {
                   key={opt.id}
                   onClick={() => {
                     setProfile(prev => ({ ...prev, futureChoice: opt.id as any }));
-                    setStep("choose-response");
                   }}
                   className={cn(
                     "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
@@ -2231,6 +2264,15 @@ function AppContent() {
                 </button>
               ))}
             </div>
+
+            <div className="flex justify-center pt-8">
+              <button
+                onClick={() => setStep("choose-response")}
+                className="px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.3em] text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+              >
+                Continue
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -2256,7 +2298,6 @@ function AppContent() {
                   key={opt.id}
                   onClick={() => {
                     setProfile(prev => ({ ...prev, responseMode: opt.id as any }));
-                    setStep("take-selfie");
                   }}
                   className={cn(
                     "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
@@ -2280,6 +2321,21 @@ function AppContent() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="flex justify-center pt-8">
+              <button
+                onClick={() => {
+                  if (profile.responseMode === "text") {
+                    skipSelfie();
+                  } else {
+                    setStep("take-selfie");
+                  }
+                }}
+                className="px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.3em] text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+              >
+                Continue
+              </button>
             </div>
             <p className="text-center text-white/30 text-[9px] font-mono uppercase tracking-[0.4em]">
               Note: You can toggle modes during active manifestation.
@@ -2592,259 +2648,323 @@ function AppContent() {
             <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] z-10" />
             <div className="scan-line opacity-20" />
             
-            <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
-              {/* User Side */}
-              <motion.div 
-                initial={{ x: -100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
-              >
-                <UserVideo stream={userStream} isCameraOn={isCameraOn} />
-                
-                {/* HUD Elements for User */}
-                <div className="absolute top-8 left-8 z-20 space-y-4">
-                  <StatusBadge label="Identity" value="Past Self" icon={User} />
-                  <StatusBadge label="Location" value="Present Day" icon={Clock} />
-                  <StatusBadge 
-                    label="Temporal Energy" 
-                    value={`${lives} Tokens Left`} 
-                    icon={Heart} 
-                    color={lives === 1 ? "text-red-400" : "text-white/60"}
-                  />
-                </div>
-              </motion.div>
-
-              {/* Future Self Side */}
-              <motion.div 
-                initial={{ x: 100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="relative flex-1 h-1/2 md:h-full overflow-hidden bg-black flex items-center justify-center z-0"
-              >
-                {futureSelf?.videoUrl ? (
-                  <FutureVideo 
-                    videoUrl={futureSelf.videoUrl} 
-                    isSpeaking={isSpeaking} 
-                    outputVolume={outputVolume} 
-                  />
-                ) : futureSelf?.imageUrl ? (
-                  <motion.img
-                    src={futureSelf.imageUrl}
-                    alt="Future Self"
-                    className="w-full h-full object-cover"
-                    animate={{
-                      scale: isSpeaking ? [1, 1.03, 1] : [1, 1.01, 1],
-                      filter: isSpeaking ? "brightness(1.1) saturate(1.1)" : "brightness(1) saturate(1)",
-                    }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="relative">
-                      <div className="w-16 h-16 border-2 border-white/10 border-t-white animate-spin rounded-full" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <RefreshCw className="w-6 h-6 text-white/40" />
-                      </div>
+            {profile.responseMode === "text" ? (
+              <div className="w-full h-full flex flex-col max-w-4xl mx-auto p-4 md:p-8 relative z-20">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border border-white/20">
+                      {futureSelf?.imageUrl ? (
+                        <img src={futureSelf.imageUrl} alt="Future Self" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-white/5 flex items-center justify-center"><User className="w-6 h-6 text-white/20" /></div>
+                      )}
                     </div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/40 animate-pulse">Manifesting Identity...</p>
+                    <div>
+                      <h3 className="text-xl font-serif italic">{profile.name} <span className="text-white/40">Manifestation</span></h3>
+                      <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Neural Link Active</p>
+                    </div>
                   </div>
-                )}
-
-                {/* HUD Elements for Future Self */}
-                <div className="absolute top-8 right-8 z-20 space-y-4 flex flex-col items-end">
-                  <StatusBadge 
-                    label="Identity" 
-                    value="Future Manifestation" 
-                    icon={Zap} 
-                    color={isSpeaking ? "text-green-400" : "text-white/60"}
-                  />
-                  <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
-                  <StatusBadge 
-                    label="Sync Limit" 
-                    value={`${questionsRemaining} Questions`} 
-                    icon={MessageSquare} 
-                    color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
-                  />
+                  <div className="flex items-center gap-4">
+                    <StatusBadge label="Sync" value={`${questionsRemaining} Left`} icon={MessageSquare} />
+                    <button onClick={endCall} className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500/20 transition-all">
+                      <PhoneOff className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
-                {isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 w-full max-w-xs px-8">
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="w-3 h-3 text-white animate-spin" />
-                        <span className="text-[9px] font-mono uppercase tracking-widest text-white/70">Updating Manifestation</span>
-                      </div>
-                      <span className="text-[9px] font-mono text-white/80">{Math.round(videoProgressPercent)}%</span>
-                    </div>
-                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
-                      <motion.div 
-                        className="h-full bg-white shadow-[0_0_10px_white]"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${videoProgressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {!futureSelf?.videoUrl && !isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
-                    <button
-                      onClick={() => generateFutureVideo()}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                    >
-                      <Video className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Manifest Video</span>
-                    </button>
-                  </div>
-                )}
-
-                {futureSelf?.videoUrl && !isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 flex gap-4">
-                    <button
-                      onClick={() => generateFutureVideo('sing')}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                    >
-                      <Music className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Sing</span>
-                    </button>
-                    <button
-                      onClick={() => generateFutureVideo('dance')}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                    >
-                      <Zap className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Dance</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Subtle Vignette */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
-              </motion.div>
-            </div>
-
-            {/* Central Content: The Orb & Transcription */}
-            <div className="relative z-20 flex flex-col items-center justify-center space-y-12 w-full h-full pointer-events-none">
-              <div className="text-center space-y-3 pointer-events-auto">
-                {callError ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-8 glass-card max-w-md border-red-500/30"
-                  >
-                    <p className="text-red-400 font-medium mb-6">{callError}</p>
-                    <button 
-                      onClick={endCall}
-                      className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
-                    >
-                      Close Connection
-                    </button>
-                  </motion.div>
-                ) : (
-                  <div className="flex flex-col items-center">
-                    <div className="flex items-center justify-center gap-3 mb-4 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
-                      <motion.div 
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                      />
-                      <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/80 font-bold">Temporal Stream Active</span>
-                    </div>
-                    <motion.h2 
+                {/* Chat Area */}
+                <div className="flex-1 overflow-y-auto mb-8 space-y-6 pr-4 custom-scrollbar">
+                  {chatMessages.map((msg, i) => (
+                    <motion.div
+                      key={i}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="text-2xl font-serif italic tracking-tight text-white/90"
+                      className={cn(
+                        "flex flex-col max-w-[80%]",
+                        msg.role === "user" ? "ml-auto items-end" : "items-start"
+                      )}
                     >
-                      {profile.name} <span className="text-white/40">Manifestation</span>
-                    </motion.h2>
-                  </div>
-                )}
-              </div>
-
-              {!callError && profile.responseMode === "voice" && (
-                <div className="pointer-events-auto">
-                  <VoiceOrb 
-                    isSpeaking={isSpeaking} 
-                    isListening={isListening} 
-                    isThinking={isChatLoading} 
-                    volume={outputVolume}
-                  />
-                </div>
-              )}
-
-              {/* Transcription Area */}
-              <div className="absolute bottom-48 left-0 right-0 px-12 flex flex-col items-center pointer-events-none z-20">
-                <AnimatePresence mode="wait">
-                  {chatMessages.length > 0 && (
-                    <motion.div
-                      key={chatMessages.length}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="max-w-3xl text-center"
-                    >
-                      <p className={cn(
-                        "text-xl md:text-3xl font-serif italic leading-relaxed drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]",
-                        chatMessages[chatMessages.length - 1].role === "model" ? "text-white text-glow" : "text-white/50"
+                      <div className={cn(
+                        "px-6 py-4 rounded-2xl text-lg leading-relaxed",
+                        msg.role === "user" 
+                          ? "bg-white text-black rounded-tr-none" 
+                          : "bg-white/5 border border-white/10 rounded-tl-none text-white/90"
                       )}>
-                        {chatMessages[chatMessages.length - 1].text}
-                      </p>
+                        {msg.text}
+                      </div>
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-white/20 mt-2">
+                        {msg.role === "user" ? "Past Self" : "Future Self"}
+                      </span>
                     </motion.div>
+                  ))}
+                  {isAITyping && (
+                    <div className="flex items-center gap-3 text-white/40">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span className="text-xs font-mono uppercase tracking-widest">Synthesizing...</span>
+                    </div>
                   )}
-                </AnimatePresence>
-              </div>
-            </div>
+                  <div ref={chatEndRef} />
+                </div>
 
-            {/* Call Controls Bar */}
-            <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
-              <div className="flex items-center gap-6 bg-black/60 backdrop-blur-2xl border border-white/10 p-3 rounded-full shadow-2xl">
-                <button
-                  onClick={toggleMute}
-                  className={cn(
-                    "p-4 rounded-full transition-all hover:bg-white/5",
-                    isMuted ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                  )}
-                >
-                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                </button>
-                
-                <button
-                  onClick={toggleCamera}
-                  className={cn(
-                    "p-4 rounded-full transition-all hover:bg-white/5",
-                    !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                  )}
-                >
-                  {!isCameraOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                </button>
-
-                <button
-                  onClick={endCall}
-                  className="p-6 bg-white text-black rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
-                >
-                  <PhoneOff className="w-8 h-8" fill="currentColor" />
-                </button>
-              </div>
-
-              {profile.responseMode === "text" && (
-                <div className="flex-1 max-w-lg flex gap-3">
+                {/* Input Area */}
+                <div className="relative">
                   <input
                     type="text"
                     value={userResponse}
                     onChange={(e) => setUserResponse(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
                     placeholder="Message your future self..."
-                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-5 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all text-base backdrop-blur-xl"
+                    className="w-full bg-white/5 border border-white/10 rounded-full py-6 px-10 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-lg"
                   />
                   <button
                     onClick={() => handleNextCallStep(userResponse)}
                     disabled={!userResponse || isAITyping}
-                    className="p-5 bg-white text-black rounded-2xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all shadow-xl"
+                    className="absolute right-3 top-3 p-4 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-30"
                   >
-                    <Send className="w-6 h-6" />
+                    <Send className="w-5 h-5" />
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
+                {/* User Side */}
+                <motion.div 
+                  initial={{ x: -100, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
+                >
+                  <UserVideo stream={userStream} isCameraOn={isCameraOn} />
+                  
+                  {/* HUD Elements for User */}
+                  <div className="absolute top-8 left-8 z-20 space-y-4">
+                    <StatusBadge label="Identity" value="Past Self" icon={User} />
+                    <StatusBadge label="Location" value="Present Day" icon={Clock} />
+                    <StatusBadge 
+                      label="Temporal Energy" 
+                      value={`${lives} Tokens Left`} 
+                      icon={Heart} 
+                      color={lives === 1 ? "text-red-400" : "text-white/60"}
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Future Self Side */}
+                <motion.div 
+                  initial={{ x: 100, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  className="relative flex-1 h-1/2 md:h-full overflow-hidden bg-black flex items-center justify-center z-0"
+                >
+                  {futureSelf?.videoUrl ? (
+                    <FutureVideo 
+                      videoUrl={futureSelf.videoUrl} 
+                      isSpeaking={isSpeaking} 
+                      outputVolume={outputVolume} 
+                    />
+                  ) : futureSelf?.imageUrl ? (
+                    <motion.img
+                      src={futureSelf.imageUrl}
+                      alt="Future Self"
+                      className="w-full h-full object-cover"
+                      animate={{
+                        scale: isSpeaking ? [1, 1.03, 1] : [1, 1.01, 1],
+                        filter: isSpeaking ? "brightness(1.1) saturate(1.1)" : "brightness(1) saturate(1)",
+                      }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-6">
+                      <div className="relative">
+                        <div className="w-16 h-16 border-2 border-white/10 border-t-white animate-spin rounded-full" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <RefreshCw className="w-6 h-6 text-white/40" />
+                        </div>
+                      </div>
+                      <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/40 animate-pulse">Manifesting Identity...</p>
+                    </div>
+                  )}
+
+                  {/* HUD Elements for Future Self */}
+                  <div className="absolute top-8 right-8 z-20 space-y-4 flex flex-col items-end">
+                    <StatusBadge 
+                      label="Identity" 
+                      value="Future Manifestation" 
+                      icon={Zap} 
+                      color={isSpeaking ? "text-green-400" : "text-white/60"}
+                    />
+                    <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
+                    <StatusBadge 
+                      label="Sync Limit" 
+                      value={`${questionsRemaining} Questions`} 
+                      icon={MessageSquare} 
+                      color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
+                    />
+                  </div>
+
+                  {isGeneratingVideo && (
+                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 w-full max-w-xs px-8">
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="w-3 h-3 text-white animate-spin" />
+                          <span className="text-[9px] font-mono uppercase tracking-widest text-white/70">Updating Manifestation</span>
+                        </div>
+                        <span className="text-[9px] font-mono text-white/80">{Math.round(videoProgressPercent)}%</span>
+                      </div>
+                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                        <motion.div 
+                          className="h-full bg-white shadow-[0_0_10px_white]"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${videoProgressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!futureSelf?.videoUrl && !isGeneratingVideo && (
+                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
+                      <button
+                        onClick={() => generateFutureVideo()}
+                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                      >
+                        <Video className="w-4 h-4 text-white/60 group-hover:text-white" />
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Manifest Video</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {futureSelf?.videoUrl && !isGeneratingVideo && (
+                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 flex gap-4">
+                      <button
+                        onClick={() => generateFutureVideo('sing')}
+                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                      >
+                        <Music className="w-4 h-4 text-white/60 group-hover:text-white" />
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Sing</span>
+                      </button>
+                      <button
+                        onClick={() => generateFutureVideo('dance')}
+                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                      >
+                        <Zap className="w-4 h-4 text-white/60 group-hover:text-white" />
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Dance</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Subtle Vignette */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+                </motion.div>
+              </div>
+            )}
+
+            {/* Central Content: The Orb & Transcription (Only for Voice Mode) */}
+            {profile.responseMode === "voice" && (
+              <div className="relative z-20 flex flex-col items-center justify-center space-y-12 w-full h-full pointer-events-none">
+                <div className="text-center space-y-3 pointer-events-auto">
+                  {callError ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-8 glass-card max-w-md border-red-500/30"
+                    >
+                      <p className="text-red-400 font-medium mb-6">{callError}</p>
+                      <button 
+                        onClick={endCall}
+                        className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
+                      >
+                        Close Connection
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <div className="flex items-center justify-center gap-3 mb-4 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
+                        <motion.div 
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                          className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]"
+                        />
+                        <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/80 font-bold">Temporal Stream Active</span>
+                      </div>
+                      <motion.h2 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-2xl font-serif italic tracking-tight text-white/90"
+                      >
+                        {profile.name} <span className="text-white/40">Manifestation</span>
+                      </motion.h2>
+                    </div>
+                  )}
+                </div>
+
+                {!callError && (
+                  <div className="pointer-events-auto">
+                    <VoiceOrb 
+                      isSpeaking={isSpeaking} 
+                      isListening={isListening} 
+                      isThinking={isChatLoading} 
+                      volume={outputVolume}
+                    />
+                  </div>
+                )}
+
+                {/* Transcription Area */}
+                <div className="absolute bottom-48 left-0 right-0 px-12 flex flex-col items-center pointer-events-none z-20">
+                  <AnimatePresence mode="wait">
+                    {chatMessages.length > 0 && (
+                      <motion.div
+                        key={chatMessages.length}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="max-w-3xl text-center"
+                      >
+                        <p className={cn(
+                          "text-xl md:text-3xl font-serif italic leading-relaxed drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]",
+                          chatMessages[chatMessages.length - 1].role === "model" ? "text-white text-glow" : "text-white/50"
+                        )}>
+                          {chatMessages[chatMessages.length - 1].text}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* Call Controls Bar (Only for Voice Mode) */}
+            {profile.responseMode === "voice" && (
+              <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
+                <div className="flex items-center gap-6 bg-black/60 backdrop-blur-2xl border border-white/10 p-3 rounded-full shadow-2xl">
+                  <button
+                    onClick={toggleMute}
+                    className={cn(
+                      "p-4 rounded-full transition-all hover:bg-white/5",
+                      isMuted ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
+                    )}
+                  >
+                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  </button>
+                  
+                  <button
+                    onClick={toggleCamera}
+                    className={cn(
+                      "p-4 rounded-full transition-all hover:bg-white/5",
+                      !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
+                    )}
+                  >
+                    {!isCameraOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                  </button>
+
+                  <button
+                    onClick={endCall}
+                    className="p-6 bg-white text-black rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
+                  >
+                    <PhoneOff className="w-8 h-8" fill="currentColor" />
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
