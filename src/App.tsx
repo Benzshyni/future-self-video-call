@@ -1490,18 +1490,20 @@ function AppContent() {
     playRing();
 
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Media devices API not supported in this browser.");
-      }
+      if (profile.responseMode === "voice") {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Media devices API not supported in this browser.");
+        }
 
-      console.log("Requesting media devices (camera and microphone)...");
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
-        audio: true 
-      });
-      console.log("Media devices access granted.");
-      streamRef.current = stream;
-      setUserStream(stream);
+        console.log("Requesting media devices (camera and microphone)...");
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+          audio: true 
+        });
+        console.log("Media devices access granted.");
+        streamRef.current = stream;
+        setUserStream(stream);
+      }
       
       // Start generating future video in background if not already present
       if (!futureSelf?.videoUrl) {
@@ -1951,7 +1953,11 @@ function AppContent() {
       // Auto-transition to incoming call after a short delay
       setTimeout(() => {
         setGenerationStage("Establishing secure connection...");
-        setStep("incoming-call");
+        if (profile.responseMode === "text") {
+          startCall();
+        } else {
+          setStep("incoming-call");
+        }
         setIsGenerating(false);
       }, 3000);
 
@@ -2363,6 +2369,7 @@ function AppContent() {
                     ref={videoRef}
                     autoPlay
                     playsInline
+                    muted
                     className="w-full h-full object-cover mirror"
                   />
                   {/* Scanner HUD Overlay */}
@@ -2667,6 +2674,12 @@ function AppContent() {
                   </div>
                   <div className="flex items-center gap-4">
                     <StatusBadge label="Sync" value={`${questionsRemaining} Left`} icon={MessageSquare} />
+                    <button 
+                      onClick={() => setStep("entry")} 
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/60 transition-all"
+                    >
+                      Home
+                    </button>
                     <button onClick={endCall} className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500/20 transition-all">
                       <PhoneOff className="w-5 h-5" />
                     </button>
