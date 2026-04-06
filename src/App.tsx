@@ -2084,7 +2084,7 @@ function AppContent() {
                   transition={{ delay: 0.2 }}
                   className="relative"
                 >
-                  <h1 className="text-6xl md:text-8xl font-serif italic tracking-tight leading-[0.9]">
+                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9]">
                     Your future self <br /> 
                     <span className="text-white/40">is calling.</span>
                   </h1>
@@ -2187,15 +2187,15 @@ function AppContent() {
             className="w-full max-w-4xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-5xl md:text-7xl font-serif italic tracking-tight text-glow">Select Destination</h2>
+              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Select Destination</h2>
               <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Coordinate Selection</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {[
-                { id: "1-year", label: "Me, 1 year from now", desc: "Short-term alignment & immediate path.", icon: <Clock className="w-6 h-6" /> },
-                { id: "5-years", label: "Me, 5 years from now", desc: "Mid-term evolution & life changes.", icon: <Zap className="w-6 h-6" /> },
-                { id: "goal", label: "Me after achieving my goal", desc: "The ultimate version of your success.", icon: <Target className="w-6 h-6" /> }
+                { id: "1-year", label: "1 Year", desc: "Immediate path.", icon: <Clock className="w-6 h-6" /> },
+                { id: "5-years", label: "5 Years", desc: "Mid-term evolution.", icon: <Zap className="w-6 h-6" /> },
+                { id: "goal", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -2204,22 +2204,22 @@ function AppContent() {
                     setStep("choose-response");
                   }}
                   className={cn(
-                    "p-10 rounded-[32px] border transition-all text-left space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.futureChoice === opt.id 
                       ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
                       : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
+                    "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
                     profile.futureChoice === opt.id ? "bg-black/10 scale-110" : "bg-white/5 group-hover:scale-110"
                   )}>
                     {opt.icon}
                   </div>
-                  <div className="space-y-2">
-                    <p className="font-medium text-xl leading-tight">{opt.label}</p>
+                  <div className="space-y-1 md:space-y-2">
+                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
                     <p className={cn(
-                      "text-sm leading-relaxed",
+                      "text-xs md:text-sm leading-relaxed",
                       profile.futureChoice === opt.id ? "text-black/60" : "text-white/40"
                     )}>{opt.desc}</p>
                   </div>
@@ -2243,14 +2243,14 @@ function AppContent() {
             className="w-full max-w-2xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-5xl md:text-7xl font-serif italic tracking-tight text-glow">Communication Mode</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Interface Selection</p>
+              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Interface</h2>
+              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Communication Mode</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {[
-                { id: "voice", label: "Voice Interface", desc: "Real-time audio link with low latency.", icon: <Mic className="w-6 h-6" /> },
-                { id: "text", label: "Text Interface", desc: "Asynchronous neural text transmission.", icon: <MessageSquare className="w-6 h-6" /> }
+                { id: "voice", label: "Voice", desc: "Real-time audio.", icon: <Mic className="w-6 h-6" /> },
+                { id: "text", label: "Text", desc: "Neural transmission.", icon: <MessageSquare className="w-6 h-6" /> }
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -2259,22 +2259,22 @@ function AppContent() {
                     setStep("take-selfie");
                   }}
                   className={cn(
-                    "p-10 rounded-[32px] border transition-all text-left space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.responseMode === opt.id 
                       ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
                       : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
+                    "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
                     profile.responseMode === opt.id ? "bg-black/10 scale-110" : "bg-white/5 group-hover:scale-110"
                   )}>
                     {opt.icon}
                   </div>
-                  <div className="space-y-2">
-                    <p className="font-medium text-xl leading-tight">{opt.label}</p>
+                  <div className="space-y-1 md:space-y-2">
+                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
                     <p className={cn(
-                      "text-sm leading-relaxed",
+                      "text-xs md:text-sm leading-relaxed",
                       profile.responseMode === opt.id ? "text-black/60" : "text-white/40"
                     )}>{opt.desc}</p>
                   </div>
@@ -2296,11 +2296,11 @@ function AppContent() {
             className="w-full max-w-3xl space-y-12 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-5xl md:text-6xl font-serif italic tracking-tight text-glow">Biometric Sync</h2>
+              <h2 className="text-4xl md:text-6xl font-serif italic tracking-tight text-glow">Biometric Sync</h2>
               <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Mirror Calibration</p>
             </div>
 
-            <div className="relative aspect-[4/3] max-w-2xl mx-auto rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
+            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
               {stream ? (
                 <>
                   <video
@@ -2360,31 +2360,39 @@ function AppContent() {
               <canvas ref={canvasRef} className="hidden" />
             </div>
 
-            <div className="flex flex-col items-center gap-8">
-              {stream && (
-                <div className="flex items-center gap-6">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
+              {stream ? (
+                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
                   <button
                     onClick={startCountdown}
                     disabled={countdown !== null}
-                    className="px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-lg font-bold shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50"
+                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-lg font-bold shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50"
                   >
                     Capture Identity
                   </button>
                   <button
-                    onClick={stopCamera}
-                    className="p-6 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-all text-white/60"
+                    onClick={skipSelfie}
+                    className="w-full md:w-auto px-12 py-6 bg-white/5 border border-white/10 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
                   >
-                    <RefreshCw className="w-6 h-6" />
+                    Skip
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-6 w-full">
+                  <button
+                    onClick={startCamera}
+                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
+                  >
+                    Enable Camera
+                  </button>
+                  <button
+                    onClick={skipSelfie}
+                    className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[9px] border-b border-white/5 pb-1"
+                  >
+                    Proceed without Biometrics
                   </button>
                 </div>
               )}
-              
-              <button
-                onClick={skipSelfie}
-                className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[9px] border-b border-white/5 pb-1"
-              >
-                Proceed without Biometrics
-              </button>
             </div>
           </motion.div>
         )}
@@ -2860,11 +2868,11 @@ function AppContent() {
                 </div>
               </div>
               <div className="space-y-4">
-                <h2 className="text-6xl md:text-7xl font-serif italic tracking-tight text-glow">Link Severed</h2>
-                <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Connection Terminated</p>
+                <h2 className="text-6xl md:text-7xl font-serif italic tracking-tight text-glow">Call Ended</h2>
+                <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Connection Closed</p>
               </div>
               <p className="text-white/60 font-light text-lg max-w-md mx-auto leading-relaxed">
-                The temporal link has been successfully closed. Your future manifestation has been archived for reflection.
+                The temporal link has been closed. Your future manifestation has been archived.
               </p>
             </div>
 
@@ -2887,13 +2895,13 @@ function AppContent() {
             <div className="space-y-20">
               <div className="space-y-10">
                 <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-[0.4em] text-white/60 backdrop-blur-xl">
-                  <Target className="w-4 h-4 text-white" /> Manifestation Roadmap
+                  <Target className="w-4 h-4 text-white" /> Your Path
                 </div>
                 <div className="space-y-6">
                   <h1 className="text-8xl md:text-[12rem] font-serif italic leading-[0.7] tracking-tighter text-glow">
                     Future <br /> <span className="text-white/10">Reflection</span>
                   </h1>
-                  <p className="text-white/40 font-mono uppercase tracking-[0.6em] text-[10px] pl-2">Temporal Archive ID: #TM-2041-A</p>
+                  <p className="text-white/40 font-mono uppercase tracking-[0.6em] text-[10px] pl-2">ID: #TM-2041-A</p>
                 </div>
               </div>
 
@@ -3214,21 +3222,22 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <footer className="fixed bottom-8 left-8 flex items-center gap-6 z-40">
-        <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 pointer-events-none">
+      <footer className="fixed bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-auto flex flex-col md:flex-row items-center gap-4 md:gap-6 z-40">
+        <span className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 pointer-events-none text-center md:text-left">
           Explow © 2026 // Future Self Exploration
         </span>
-        <div className="flex items-center gap-6 pointer-events-auto">
+        <div className="flex items-center gap-4 md:gap-6 pointer-events-auto">
           <button 
             onClick={() => setIsPhilosophyModalOpen(true)}
-            className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 hover:text-white/60 transition-colors"
+            className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 hover:text-white/60 transition-colors"
           >
             Philosophy
           </button>
           <button 
             onClick={clearSavedData}
-            className="text-[10px] font-mono uppercase tracking-[0.3em] text-red-500/20 hover:text-red-500/60 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-full text-[8px] md:text-[10px] font-mono uppercase tracking-[0.3em] text-red-500/40 hover:text-red-500 transition-all group"
           >
+            <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
             Reset Identity
           </button>
         </div>
