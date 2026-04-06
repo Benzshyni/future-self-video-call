@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and token status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "lives": { "type": "integer", "description": "Daily tokens remaining" },
+        "lastReset": { "type": "string", "format": "date-time", "description": "Last time tokens were reset" }
+      },
+      "required": ["uid", "email", "lives"]
+    },
+    "Manifestation": {
+      "title": "Manifestation",
+      "description": "A generated future self record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "passion": { "type": "string" },
+        "futureChoice": { "type": "string" },
+        "responseMode": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "videoUrl": { "type": "string", "format": "uri" },
+        "contextualObservation": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/manifestations/{manifestationId}": {
+      "schema": "Manifestation",
+      "description": "History of manifestations"
+    }
+  }
+}

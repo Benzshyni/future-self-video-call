@@ -6,8 +6,63 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, ErrorInfo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music } from "lucide-react";
+import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, LogOut, LogIn, History, Trash2 } from "lucide-react";
 import { cn } from "./lib/utils";
+import { auth, db, googleProvider } from "./firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 declare global {
   interface Window {
@@ -91,6 +146,7 @@ interface FutureSelf {
   traits: string[];
   visualDescription: string;
   gender: "male" | "female" | "neutral";
+  contextualObservation?: string;
   imageUrl?: string;
   videoUrl?: string;
   recap?: {
@@ -631,7 +687,64 @@ const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: 
   );
 };
 
-export default function App() {
+const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onDelete: (id: string) => void, onSelect: (item: any) => void }) => {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-6 mt-12">
+      <div className="flex items-center justify-between px-4">
+        <div className="flex items-center gap-2 text-white/40 font-mono text-[10px] uppercase tracking-[0.2em]">
+          <History className="w-3 h-3" />
+          Manifestation Gallery
+        </div>
+        <div className="h-px flex-1 bg-white/5 mx-4" />
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
+        {items.map((item) => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ y: -5 }}
+            className="group relative aspect-square rounded-2xl overflow-hidden bg-white/5 border border-white/10 cursor-pointer"
+            onClick={() => onSelect(item)}
+          >
+            {item.imageUrl ? (
+              <img 
+                src={item.imageUrl} 
+                alt={item.name} 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white/20" />
+              </div>
+            )}
+            
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+              <p className="text-[10px] font-medium text-white truncate">{item.name}</p>
+              <p className="text-[8px] text-white/60 font-mono">{item.futureChoice}</p>
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(item.id);
+              }}
+              className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-red-500/80 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300"
+            >
+              <Trash2 className="w-3 h-3 text-white" />
+            </button>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+function App() {
   return (
     <ErrorBoundary>
       <AppContent />
@@ -640,6 +753,7 @@ export default function App() {
 }
 
 function AppContent() {
+  const [user, loading, authError] = useAuthState(auth);
   const [step, setStep] = useState<Step>("entry");
   const [profile, setProfile] = useState<UserProfile>({
     name: "",
@@ -718,24 +832,62 @@ function AppContent() {
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
 
-  const [lives, setLives] = useState(() => {
-    const saved = localStorage.getItem("explow_lives");
-    const lastReset = localStorage.getItem("explow_last_reset");
-    const now = Date.now();
-    
-    if (lastReset) {
-      const timePassed = now - parseInt(lastReset);
-      if (timePassed > 24 * 60 * 60 * 1000) {
-        localStorage.setItem("explow_lives", "3");
-        localStorage.setItem("explow_last_reset", now.toString());
-        return 3;
-      }
-    } else {
-      localStorage.setItem("explow_last_reset", now.toString());
+  const [lives, setLives] = useState(3);
+  const [manifestations, setManifestations] = useState<any[]>([]);
+
+  // Firebase Sync
+  useEffect(() => {
+    if (!user) {
+      setLives(3);
+      setManifestations([]);
+      return;
     }
-    
-    return saved ? parseInt(saved) : 3;
-  });
+
+    const userDocRef = doc(db, "users", user.uid);
+    const manifestationsQuery = query(
+      collection(db, "manifestations"),
+      where("uid", "==", user.uid),
+      orderBy("timestamp", "desc")
+    );
+
+    const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const lastReset = data.lastReset ? new Date(data.lastReset).getTime() : 0;
+        const now = Date.now();
+        
+        if (now - lastReset > 24 * 60 * 60 * 1000) {
+          updateDoc(userDocRef, {
+            lives: 3,
+            lastReset: new Date().toISOString()
+          }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
+          setLives(3);
+        } else {
+          setLives(data.lives ?? 3);
+        }
+      } else {
+        setDoc(userDocRef, {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          lives: 3,
+          lastReset: new Date().toISOString()
+        }).catch(e => handleFirestoreError(e, OperationType.CREATE, `users/${user.uid}`));
+        setLives(3);
+      }
+    }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}`));
+
+    const unsubscribeManifestations = onSnapshot(manifestationsQuery, (snapshot) => {
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setManifestations(docs);
+    }, (e) => handleFirestoreError(e, OperationType.GET, "manifestations"));
+
+    return () => {
+      unsubscribeUser();
+      unsubscribeManifestations();
+    };
+  }, [user]);
 
   const [questionsRemaining, setQuestionsRemaining] = useState(4);
 
@@ -887,7 +1039,7 @@ function AppContent() {
       User's response: ${response || "None"}.
       
       Based on the step, ask the next question or give a closing reflection.
-      Step 0: Greet your past self for the first time and introduce the temporal manifestation.
+      Step 0: Greet your past self for the first time and introduce the temporal manifestation. ${futureSelf?.contextualObservation ? `Start by gently acknowledging their current environment or appearance: "${futureSelf.contextualObservation}".` : ""}
       Step 1: Ask about their biggest goal.
       Step 2: Ask how they feel about their progress today.
       Step 3: Ask what one small habit they can start tomorrow.
@@ -1922,8 +2074,21 @@ function AppContent() {
     }
   };
 
+  const deleteManifestation = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, "manifestations", id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `manifestations/${id}`);
+    }
+  };
+
   const generateFutureSelf = async (selfieData?: string) => {
     if (isGenerating) return;
+    if (lives <= 0) {
+      setCallError("You have reached your daily manifestation limit. Please return tomorrow.");
+      return;
+    }
 
     // Ensure API key is selected for advanced image generation
     if (window.aistudio?.hasSelectedApiKey) {
@@ -1937,6 +2102,20 @@ function AppContent() {
     setIsGenerating(true);
     setGenerationStage("Initializing temporal link...");
     try {
+      // Deduct life
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
+        await updateDoc(userDocRef, {
+          lives: lives - 1
+        });
+      } else {
+        setLives(prev => {
+          const next = Math.max(0, prev - 1);
+          localStorage.setItem("explow_lives", next.toString());
+          return next;
+        });
+      }
+
       const ai = getAI();
       
       setGenerationStage("Synthesizing temporal narrative...");
@@ -1958,7 +2137,8 @@ function AppContent() {
         4. A "Future Recap" which includes a concise summary of their journey and 3 actionable steps they should take today to manifest this future.
         5. 3-4 interactive "hotspots" (x, y coordinates from 0-100, label, and a short description) that reveal specific skills or life achievements.
         6. A "Timeline" with 3 stages (+5, +10, +20 years), each with a short narrative and visual description.
-        7. The gender of the person in the selfie or based on the profile (male, female, or neutral).` }
+        7. The gender of the person in the selfie or based on the profile (male, female, or neutral).
+        8. A "Contextual Observation": A gentle, human-like acknowledgement of high-level visual cues from the user's current environment or appearance in the selfie (e.g., "I love that shade of blue you're wearing," or "The light in your room feels so peaceful today"). Use soft language and optional light humor. Do NOT identify people, store data, or make sensitive inferences. Keep it brief and warm.` }
       ];
 
       const currentSelfie = selfieData || profile.selfie;
@@ -2017,8 +2197,9 @@ function AppContent() {
                 },
               },
               gender: { type: Type.STRING, enum: ["male", "female", "neutral"] },
+              contextualObservation: { type: Type.STRING },
             },
-            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender"],
+            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender", "contextualObservation"],
           },
         },
       });
@@ -2134,6 +2315,22 @@ function AppContent() {
                 const updatedStages = [...prev.timelineStages];
                 updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
                 const updated = { ...prev, timelineStages: updatedStages };
+                
+                // Save to Firestore if it's the last stage
+                if (i === data.timelineStages.length - 1 && user) {
+                  addDoc(collection(db, "manifestations"), {
+                    uid: user.uid,
+                    name: profile.name,
+                    passion: profile.passion,
+                    futureChoice: profile.futureChoice,
+                    responseMode: profile.responseMode,
+                    imageUrl: updated.imageUrl || "",
+                    videoUrl: updated.videoUrl || "",
+                    contextualObservation: updated.contextualObservation || "",
+                    timestamp: new Date().toISOString()
+                  }).catch(err => console.error("Failed to save manifestation:", err));
+                }
+                
                 return updated;
               });
               break;
@@ -2182,6 +2379,33 @@ function AppContent() {
             totalSteps={4}
           >
             <div className="space-y-8">
+              {/* Auth Header */}
+              <div className="flex justify-center mb-8">
+                {user ? (
+                  <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full py-2 px-4 backdrop-blur-xl">
+                    <img src={user.photoURL || ""} alt={user.displayName || ""} className="w-8 h-8 rounded-full border border-white/20" referrerPolicy="no-referrer" />
+                    <div className="flex flex-col items-start pr-2">
+                      <span className="text-[10px] font-mono text-white/40 leading-none mb-1">Authenticated</span>
+                      <span className="text-xs font-medium text-white/80 leading-none">{user.displayName}</span>
+                    </div>
+                    <button 
+                      onClick={() => signOut(auth)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => signInWithPopup(auth, googleProvider)}
+                    className="flex items-center gap-3 bg-white text-black py-3 px-6 rounded-full font-medium hover:scale-105 transition-all shadow-xl"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    Sign in to Sync Tokens
+                  </button>
+                )}
+              </div>
+
               {callError && (
                 <motion.div
                   initial={{ opacity: 0, y: -20 }}
@@ -2270,7 +2494,7 @@ function AppContent() {
                     setStep("choose-future");
                   }
                 }}
-                disabled={!profile.name || !profile.passion}
+                disabled={!profile.name || !profile.passion || lives <= 0}
                 className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="relative z-10 flex items-center">
@@ -2304,6 +2528,33 @@ function AppContent() {
                 </div>
               </div>
             </motion.div>
+
+            <ManifestationGallery 
+              items={manifestations} 
+              onDelete={deleteManifestation}
+              onSelect={(m) => {
+                setFutureSelf({
+                  narrative: "",
+                  traits: [],
+                  visualDescription: "",
+                  gender: "neutral",
+                  contextualObservation: m.contextualObservation || "",
+                  recap: { summary: "", actionSteps: [] },
+                  hotspots: [],
+                  timelineStages: [],
+                  imageUrl: m.imageUrl,
+                  videoUrl: m.videoUrl
+                });
+                setProfile(prev => ({
+                  ...prev,
+                  name: m.name,
+                  passion: m.passion,
+                  futureChoice: m.futureChoice,
+                  responseMode: m.responseMode
+                }));
+                setStep("takeaway");
+              }}
+            />
           </OnboardingStep>
         )}
 
@@ -2903,16 +3154,37 @@ function AppContent() {
                     <StatusBadge 
                       label="Identity" 
                       value="Future Manifestation" 
-                      icon={Zap} 
+                      icon={Sparkles} 
                       color={isSpeaking ? "text-green-400" : "text-white/60"}
                     />
-                    <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
+                    <StatusBadge 
+                      label="Temporal Offset" 
+                      value={profile.futureChoice === '1-year' ? '+1 Year' : profile.futureChoice === '5-years' ? '+5 Years' : 'Goal Achieved'} 
+                      icon={Clock} 
+                    />
                     <StatusBadge 
                       label="Sync Limit" 
                       value={`${questionsRemaining} Questions`} 
                       icon={MessageSquare} 
                       color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
                     />
+
+                    {futureSelf?.contextualObservation && (
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 2 }}
+                        className="mt-8 max-w-[200px] bg-white/5 backdrop-blur-xl border border-white/10 p-4 rounded-2xl text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                          <span className="text-[8px] font-mono uppercase tracking-widest text-white/40">Neural Observation</span>
+                        </div>
+                        <p className="text-[10px] text-white/80 leading-relaxed italic">
+                          "{futureSelf.contextualObservation}"
+                        </p>
+                      </motion.div>
+                    )}
                   </div>
 
                   {isGeneratingVideo && (
@@ -3147,6 +3419,18 @@ function AppContent() {
                   <p className="text-4xl md:text-5xl text-white leading-[1.1] font-serif italic tracking-tight">
                     "{futureSelf.narrative}"
                   </p>
+                  
+                  {futureSelf.contextualObservation && (
+                    <div className="pt-8 border-t border-white/5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-[9px] font-mono uppercase tracking-[0.4em] text-white/40">Temporal Sync Observation</span>
+                      </div>
+                      <p className="text-lg text-white/60 font-light italic leading-relaxed">
+                        "{futureSelf.contextualObservation}"
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -3487,3 +3771,5 @@ function AppContent() {
     </div>
   );
 }
+
+export default App;
