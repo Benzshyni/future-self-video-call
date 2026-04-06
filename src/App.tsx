@@ -577,6 +577,60 @@ const FutureVideo = memo(({ videoUrl, isSpeaking, outputVolume }: { videoUrl: st
 
 FutureVideo.displayName = "FutureVideo";
 
+const ProgressIndicator = ({ current, total }: { current: number; total: number }) => {
+  return (
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 flex items-center gap-3 z-[150]">
+      {[...Array(total)].map((_, i) => (
+        <div key={i} className="flex items-center">
+          <motion.div
+            initial={false}
+            animate={{
+              width: i === current ? 40 : 8,
+              backgroundColor: i <= current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)",
+              boxShadow: i === current ? "0 0 15px rgba(255,255,255,0.5)" : "none"
+            }}
+            className="h-1.5 rounded-full transition-all duration-500"
+          />
+          {i < total - 1 && (
+            <div className="w-4 h-px bg-white/5 mx-1" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: { children: React.ReactNode; title: string; subtitle: string; currentStep: number; totalSteps: number }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="w-full max-w-4xl mx-auto space-y-12 relative z-10"
+    >
+      <div className="text-center space-y-4">
+        <motion.h2 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow"
+        >
+          {title}
+        </motion.h2>
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]"
+        >
+          {subtitle}
+        </motion.p>
+      </div>
+      
+      {children}
+    </motion.div>
+  );
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -692,9 +746,19 @@ function AppContent() {
       if (videoRef.current) {
         videoRef.current.srcObject = s;
       }
-    } catch (err) {
+      setCallError(null);
+    } catch (err: any) {
       console.error("Error accessing camera:", err);
-      setCallError("Could not access camera. Please check permissions.");
+      if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
+        setCallError(
+          <div className="space-y-4">
+            <p>Camera permission was denied. Please enable it in your browser settings to use the temporal mirror.</p>
+            <p className="text-[10px] opacity-60">Look for a camera icon in your address bar to reset permissions.</p>
+          </div>
+        );
+      } else {
+        setCallError("Could not access camera. Please check your connection.");
+      }
     }
   };
 
@@ -1639,9 +1703,23 @@ function AppContent() {
       clearInterval(ringInterval);
       console.error("Call initialization failed:", err);
       
-      let errorMessage = "Call failed to start.";
+      let errorMessage: React.ReactNode = "Call failed to start.";
       if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
-        errorMessage = "Camera or Microphone permission denied. Please enable them in your browser settings.";
+        errorMessage = (
+          <div className="space-y-4">
+            <p>Camera or Microphone permission denied. Please enable them in your browser settings.</p>
+            <button 
+              onClick={() => {
+                setProfile(prev => ({ ...prev, responseMode: "text" }));
+                setCallError(null);
+                startCall();
+              }}
+              className="text-white underline text-xs"
+            >
+              Switch to Text Mode instead
+            </button>
+          </div>
+        );
       } else if (err.name === "NotFoundError") {
         errorMessage = "No camera or microphone found.";
       } else {
@@ -2083,14 +2161,25 @@ function AppContent() {
       <TemporalGrid />
       <TemporalHUD />
 
+      {["entry", "choose-future", "choose-response", "take-selfie"].includes(step) && (
+        <ProgressIndicator 
+          current={
+            step === "entry" ? 0 : 
+            step === "choose-future" ? 1 : 
+            step === "choose-response" ? 2 : 3
+          } 
+          total={4} 
+        />
+      )}
+
       <AnimatePresence mode="wait">
         {step === "entry" && (
-          <motion.div
+          <OnboardingStep
             key="entry"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            className="w-full max-w-2xl text-center space-y-16 relative z-10"
+            title="Identity Sync"
+            subtitle="Temporal Link Initialization"
+            currentStep={0}
+            totalSteps={4}
           >
             <div className="space-y-8">
               {callError && (
@@ -2118,7 +2207,7 @@ function AppContent() {
                   transition={{ delay: 0.2 }}
                   className="relative"
                 >
-                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9]">
+                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9] text-center">
                     Your future self <br /> 
                     <span className="text-white/40">is calling.</span>
                   </h1>
@@ -2192,7 +2281,7 @@ function AppContent() {
 
               <div className="flex flex-col items-center gap-4">
                 {hasApiKey === false && (
-                  <p className="text-white/30 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">
+                  <p className="text-white/30 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed text-center">
                     A paid Gemini API key is required to synthesize temporal video data.
                   </p>
                 )}
@@ -2215,27 +2304,22 @@ function AppContent() {
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </OnboardingStep>
         )}
 
         {step === "choose-future" && (
-          <motion.div
+          <OnboardingStep
             key="choose-future"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            className="w-full max-w-4xl space-y-16 relative z-10"
+            title="Destination"
+            subtitle="Temporal Coordinate Selection"
+            currentStep={1}
+            totalSteps={4}
           >
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Select Destination</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Coordinate Selection</p>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {[
                 { id: "1-year", label: "1 Year", desc: "Immediate path.", icon: <Clock className="w-6 h-6" /> },
                 { id: "5-years", label: "5 Years", desc: "Mid-term evolution.", icon: <Zap className="w-6 h-6" /> },
-                { id: "goal", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
+                { id: "goal-achieved", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -2271,7 +2355,13 @@ function AppContent() {
               ))}
             </div>
 
-            <div className="flex justify-center pt-8">
+            <div className="flex justify-center gap-6 pt-8">
+              <button
+                onClick={() => setStep("entry")}
+                className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+              >
+                Back
+              </button>
               <button
                 onClick={() => setStep("choose-response")}
                 className="px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.3em] text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
@@ -2279,22 +2369,17 @@ function AppContent() {
                 Continue
               </button>
             </div>
-          </motion.div>
+          </OnboardingStep>
         )}
 
         {step === "choose-response" && (
-          <motion.div
+          <OnboardingStep
             key="choose-response"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            className="w-full max-w-2xl space-y-16 relative z-10"
+            title="Interface"
+            subtitle="Communication Mode"
+            currentStep={2}
+            totalSteps={4}
           >
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Interface</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Communication Mode</p>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {[
                 { id: "voice", label: "Voice", desc: "Real-time audio.", icon: <Mic className="w-6 h-6" /> },
@@ -2329,7 +2414,13 @@ function AppContent() {
               ))}
             </div>
 
-            <div className="flex justify-center pt-8">
+            <div className="flex justify-center gap-6 pt-8">
+              <button
+                onClick={() => setStep("choose-future")}
+                className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+              >
+                Back
+              </button>
               <button
                 onClick={() => {
                   if (profile.responseMode === "text") {
@@ -2346,22 +2437,17 @@ function AppContent() {
             <p className="text-center text-white/30 text-[9px] font-mono uppercase tracking-[0.4em]">
               Note: You can toggle modes during active manifestation.
             </p>
-          </motion.div>
+          </OnboardingStep>
         )}
 
         {step === "take-selfie" && (
-          <motion.div
+          <OnboardingStep
             key="take-selfie"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            className="w-full max-w-3xl space-y-12 relative z-10"
+            title="Biometric Sync"
+            subtitle="Temporal Mirror Calibration"
+            currentStep={3}
+            totalSteps={4}
           >
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-6xl font-serif italic tracking-tight text-glow">Biometric Sync</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Mirror Calibration</p>
-            </div>
-
             <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
               {stream ? (
                 <>
@@ -2427,6 +2513,12 @@ function AppContent() {
               {stream ? (
                 <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
                   <button
+                    onClick={() => setStep("choose-response")}
+                    className="w-full md:w-auto px-8 py-6 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                  >
+                    Back
+                  </button>
+                  <button
                     onClick={startCountdown}
                     disabled={countdown !== null}
                     className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-lg font-bold shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50"
@@ -2442,12 +2534,20 @@ function AppContent() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-6 w-full">
-                  <button
-                    onClick={startCamera}
-                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
-                  >
-                    Enable Camera
-                  </button>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setStep("choose-response")}
+                      className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={startCamera}
+                      className="px-12 py-5 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
+                    >
+                      Enable Camera
+                    </button>
+                  </div>
                   <button
                     onClick={skipSelfie}
                     className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[9px] border-b border-white/5 pb-1"
@@ -2457,7 +2557,7 @@ function AppContent() {
                 </div>
               )}
             </div>
-          </motion.div>
+          </OnboardingStep>
         )}
 
         {step === "transformation" && (
