@@ -656,6 +656,27 @@ function AppContent() {
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
 
+  const [lives, setLives] = useState(() => {
+    const saved = localStorage.getItem("explow_lives");
+    const lastReset = localStorage.getItem("explow_last_reset");
+    const now = Date.now();
+    
+    if (lastReset) {
+      const timePassed = now - parseInt(lastReset);
+      if (timePassed > 24 * 60 * 60 * 1000) {
+        localStorage.setItem("explow_lives", "3");
+        localStorage.setItem("explow_last_reset", now.toString());
+        return 3;
+      }
+    } else {
+      localStorage.setItem("explow_last_reset", now.toString());
+    }
+    
+    return saved ? parseInt(saved) : 3;
+  });
+
+  const [questionsRemaining, setQuestionsRemaining] = useState(4);
+
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -745,6 +766,37 @@ function AppContent() {
   const handleNextCallStep = async (response?: string) => {
     if (isAITyping) return;
     
+    if (questionsRemaining <= 0 && callStep < 4) {
+      setCallStep(4);
+      setIsAITyping(true);
+      try {
+        const ai = getAI();
+        const prompt = `You are the Digital Future Self of ${profile.name}. 
+        The temporal link is fading because the user has reached their question limit for this session.
+        Give a final, brief, and inspiring closing message to end the call gracefully.`;
+
+        const result = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const aiText = result.text;
+        setAiMessage(aiText);
+        const history = [...chatHistory];
+        history.push({ role: "model", text: aiText });
+        setChatHistory(history);
+        
+        if (profile.responseMode === "voice") {
+          handleSpeak(aiText);
+        }
+      } catch (err) {
+        console.error("Final message failed:", err);
+      } finally {
+        setIsAITyping(false);
+      }
+      return;
+    }
+
     const nextStep = callStep + 1;
     setCallStep(nextStep);
     setIsAITyping(true);
@@ -753,6 +805,7 @@ function AppContent() {
     if (response) {
       history.push({ role: "user", text: response });
       setChatHistory(history);
+      setQuestionsRemaining(prev => prev - 1);
     }
 
     try {
@@ -1132,6 +1185,14 @@ function AppContent() {
     const messageText = textOverride || currentInput;
     if (!messageText.trim() || !futureSelf || isChatLoading) return;
 
+    if (questionsRemaining <= 0) {
+      setChatMessages((prev) => [...prev, { 
+        role: "model", 
+        text: "The temporal link is fading. I've shared as much as I can for this session. Let's reflect on what we've discussed. You can return in 24 hours for a full recharge." 
+      }]);
+      return;
+    }
+
     // Interrupt current speaking if user sends a new message
     stopSpeaking();
 
@@ -1139,6 +1200,7 @@ function AppContent() {
     setChatMessages((prev) => [...prev, userMessage]);
     setCurrentInput("");
     setIsChatLoading(true);
+    setQuestionsRemaining(prev => prev - 1);
 
     try {
       const ai = getAI();
@@ -1317,6 +1379,39 @@ function AppContent() {
   const startCall = async () => {
     if (isCallActive) return;
     
+    if (lives <= 0) {
+      setCallError(
+        <div className="flex flex-col items-center gap-6 text-center p-12 glass-card max-w-md mx-auto">
+          <div className="relative">
+            <Heart className="w-16 h-16 text-red-500/20" />
+            <Heart className="absolute inset-0 w-16 h-16 text-red-500 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-3xl font-serif italic text-glow">Energy Depleted</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Your temporal tokens have been exhausted. The manifestation requires 24 hours to re-align with your timeline.
+            </p>
+          </div>
+          <div className="w-full h-[1px] bg-white/10" />
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/40">Recharge Status</p>
+            <p className="text-xs font-mono text-white/80">Next Token Available in ~24h</p>
+          </div>
+          <button 
+            onClick={() => {
+              setStep("result");
+              setCallError(null);
+            }}
+            className="w-full py-4 bg-white text-black rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:scale-[1.02] transition-all"
+          >
+            Return to Manifestation
+          </button>
+        </div>
+      );
+      setStep("video-call");
+      return;
+    }
+
     // Interrupt any ongoing TTS
     stopSpeaking();
     
@@ -1325,6 +1420,14 @@ function AppContent() {
 
     setCallError(null);
     setStep("video-call");
+    
+    setLives(prev => {
+      const next = prev - 1;
+      localStorage.setItem("explow_lives", next.toString());
+      return next;
+    });
+    setQuestionsRemaining(4);
+
     // Stop any active speech recognition
     if (recognitionRef.current) {
       try {
@@ -2016,14 +2119,18 @@ function AppContent() {
                 </div>
               </motion.div>
 
-              <motion.p 
+              <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="text-white/30 font-mono uppercase tracking-[0.6em] text-[9px] pt-4"
+                className="text-white/30 font-mono uppercase tracking-[0.6em] text-[9px] pt-4 flex flex-col items-center gap-2"
               >
-                Temporal Link Status: <span className="text-white/60">Ready</span>
-              </motion.p>
+                <div>Temporal Link Status: <span className="text-white/60">Ready</span></div>
+                <div className="flex items-center gap-2">
+                  <Heart className={cn("w-3 h-3", lives === 0 ? "text-red-500" : "text-white/40")} />
+                  <span>{lives} / 3 Daily Tokens Available</span>
+                </div>
+              </motion.div>
             </div>
 
             <motion.div 
@@ -2490,6 +2597,12 @@ function AppContent() {
                 <div className="absolute top-8 left-8 z-20 space-y-4">
                   <StatusBadge label="Identity" value="Past Self" icon={User} />
                   <StatusBadge label="Location" value="Present Day" icon={Clock} />
+                  <StatusBadge 
+                    label="Temporal Energy" 
+                    value={`${lives} Tokens Left`} 
+                    icon={Heart} 
+                    color={lives === 1 ? "text-red-400" : "text-white/60"}
+                  />
                 </div>
               </motion.div>
 
@@ -2538,6 +2651,12 @@ function AppContent() {
                     color={isSpeaking ? "text-green-400" : "text-white/60"}
                   />
                   <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
+                  <StatusBadge 
+                    label="Sync Limit" 
+                    value={`${questionsRemaining} Questions`} 
+                    icon={MessageSquare} 
+                    color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
+                  />
                 </div>
 
                 {isGeneratingVideo && (
@@ -2979,7 +3098,16 @@ function AppContent() {
                   </div>
                   <div>
                     <h3 className="font-serif italic text-lg">Your Future Self</h3>
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Connection</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Connection</p>
+                      <div className="w-1 h-1 rounded-full bg-white/20" />
+                      <p className={cn(
+                        "text-[10px] font-mono uppercase tracking-widest transition-colors",
+                        questionsRemaining <= 1 ? "text-orange-400" : "text-white/40"
+                      )}>
+                        {questionsRemaining} Syncs Left
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
