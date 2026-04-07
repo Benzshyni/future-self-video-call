@@ -797,6 +797,7 @@ function AppContent() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const avatarUploadRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [callError, setCallError] = useState<React.ReactNode | null>(null);
@@ -947,6 +948,34 @@ function AppContent() {
   };
 
   const [countdown, setCountdown] = useState<number | null>(null);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setProfile(prev => ({ ...prev, selfie: base64 }));
+      setStep("transformation");
+      generateFutureSelf(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleManualAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setFutureSelf(prev => prev ? { ...prev, imageUrl: base64 } : null);
+      setIsGeneratingImage(false);
+      setGenerationStage("Avatar manually uploaded.");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const startCountdown = () => {
     setCountdown(3);
@@ -2367,6 +2396,7 @@ function AppContent() {
         }
       } catch (imageError) {
         console.error("Image generation failed:", imageError);
+        setGenerationStage("Image generation failed. You can upload an avatar manually.");
       } finally {
         setIsGeneratingImage(false);
       }
@@ -2425,55 +2455,86 @@ function AppContent() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-6">
-                    <button 
-                      disabled={loading || isSigningIn}
-                      onClick={async () => {
-                        console.log("Attempting sign-in with popup...");
-                        setIsSigningIn(true);
-                        setCallError(null);
-                        try {
-                          const result = await signInWithPopup(auth, googleProvider);
-                          console.log("Sign-in successful:", result.user.displayName);
-                        } catch (error: any) {
-                          console.error("Sign-in error:", error);
-                          setIsSigningIn(false);
-                          setCallError(
-                            <div className="space-y-2">
-                              <p className="font-bold">Sign-in failed</p>
-                              <p className="text-xs opacity-80">{error?.message || "Please check if popups are blocked in your browser."}</p>
-                              <button 
-                                onClick={() => setStep("choose-future")}
-                                className="mt-2 text-[10px] underline uppercase tracking-widest"
-                              >
-                                Continue as Guest instead
-                              </button>
-                            </div>
-                          );
-                        }
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 bg-white text-black py-4 px-8 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-2xl",
-                        (loading || isSigningIn) && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      {isSigningIn ? (
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <LogIn className="w-5 h-5" />
-                      )}
-                      {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
-                    </button>
-
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-col items-center gap-4">
                       <button 
-                        onClick={() => setStep("choose-future")}
-                        className="text-[10px] font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
+                        disabled={isSigningIn}
+                        onClick={async () => {
+                          console.log("Manual sign-in trigger. Auth state:", { loading, user: !!user });
+                          setIsSigningIn(true);
+                          setCallError(null);
+                          try {
+                            const result = await signInWithPopup(auth, googleProvider);
+                            console.log("Sign-in successful:", result.user.displayName);
+                            setIsSigningIn(false);
+                          } catch (error: any) {
+                            console.error("Sign-in error:", error);
+                            setIsSigningIn(false);
+                            
+                            let errorMsg = error?.message || "Unknown error";
+                            if (error?.code === "auth/popup-blocked") {
+                              errorMsg = "The sign-in popup was blocked by your browser. Please allow popups for this site.";
+                            } else if (error?.code === "auth/unauthorized-domain") {
+                              errorMsg = "This domain is not authorized for Firebase Auth. Please add it to the 'Authorized domains' list in the Firebase Console.";
+                            }
+
+                            setCallError(
+                              <div className="space-y-3">
+                                <p className="font-bold text-red-400">Sign-in failed</p>
+                                <p className="text-xs opacity-80 leading-relaxed">{errorMsg}</p>
+                                <div className="flex flex-col gap-2 pt-2">
+                                  <button 
+                                    onClick={() => setStep("choose-future")}
+                                    className="text-[10px] underline uppercase tracking-widest text-white/60 hover:text-white"
+                                  >
+                                    Continue as Guest instead
+                                  </button>
+                                  <button 
+                                    onClick={() => signOut(auth).then(() => window.location.reload())}
+                                    className="text-[10px] underline uppercase tracking-widest text-white/60 hover:text-white"
+                                  >
+                                    Reset Auth & Reload
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 bg-white text-black py-4 px-8 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-2xl",
+                          isSigningIn && "opacity-50 cursor-not-allowed"
+                        )}
                       >
-                        Continue as Guest
+                        {isSigningIn ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <LogIn className="w-5 h-5" />
+                        )}
+                        {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
                       </button>
-                      <p className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
-                        Tokens will be saved locally
+
+                      <div className="flex flex-col items-center gap-2">
+                        <button 
+                          onClick={() => setStep("choose-future")}
+                          className="text-[10px] font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
+                        >
+                          Continue as Guest
+                        </button>
+                        <p className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
+                          Tokens will be saved locally
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Debug Auth Info (Small) */}
+                    <div className="pt-4 flex flex-col items-center gap-1 opacity-20 hover:opacity-100 transition-opacity">
+                      <p className="text-[8px] font-mono uppercase tracking-widest">
+                        Auth Status: {loading ? "Initializing..." : user ? "Authenticated" : "Idle"}
                       </p>
+                      {authError && (
+                        <p className="text-[8px] font-mono text-red-400 uppercase tracking-widest">
+                          Init Error: {(authError as any).code || "Unknown"}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2828,6 +2889,23 @@ function AppContent() {
                   >
                     Enable Temporal Mirror
                   </button>
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest">Or</p>
+                    <button
+                      onClick={() => avatarUploadRef.current?.click()}
+                      className="flex items-center gap-2 text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
+                    >
+                      <Upload className="w-3 h-3" />
+                      Upload Selfie
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={avatarUploadRef} 
+                      onChange={handleAvatarUpload} 
+                      accept="image/*" 
+                      className="hidden" 
+                    />
+                  </div>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
@@ -2977,6 +3055,26 @@ function AppContent() {
                     animate={{ x: ["-100%", "200%"] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                     className="absolute inset-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  />
+                </div>
+                
+                <div className="flex flex-col items-center gap-4 pt-4">
+                  <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                    AI generation can take up to 30 seconds. If it hangs, you can manually upload your avatar.
+                  </p>
+                  <button
+                    onClick={() => avatarUploadRef.current?.click()}
+                    className="flex items-center gap-2 text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Upload Avatar Manually
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={avatarUploadRef} 
+                    onChange={handleManualAvatarUpload} 
+                    accept="image/*" 
+                    className="hidden" 
                   />
                 </div>
               </div>
