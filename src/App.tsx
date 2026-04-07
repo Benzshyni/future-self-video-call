@@ -688,20 +688,26 @@ const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: 
 };
 
 const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onDelete: (id: string) => void, onSelect: (item: any) => void }) => {
-  if (items.length === 0) return null;
+  const samples = [
+    { id: 'sample-1', name: 'Aria', passion: 'Digital Art', futureChoice: '5-years', narrative: 'A world-renowned digital artist pushing the boundaries of VR.', traits: ['Visionary', 'Creative', 'Resilient'], contextualObservation: 'The light in your studio is perfect for creation.', imageUrl: 'https://picsum.photos/seed/aria/800/800' },
+    { id: 'sample-2', name: 'Leo', passion: 'Sustainable Tech', futureChoice: '1-year', narrative: 'Leading a startup that revolutionizes carbon capture.', traits: ['Innovative', 'Driven', 'Empathetic'], contextualObservation: 'Your focus is inspiring.', imageUrl: 'https://picsum.photos/seed/leo/800/800' },
+    { id: 'sample-3', name: 'Maya', passion: 'Ocean Conservation', futureChoice: 'goal-achieved', narrative: 'Successfully restored a coral reef ecosystem.', traits: ['Protector', 'Wise', 'Calm'], contextualObservation: 'The ocean waves are calling you.', imageUrl: 'https://picsum.photos/seed/maya/800/800' },
+  ];
+
+  const displayItems = items.length > 0 ? items : samples;
 
   return (
     <div className="space-y-6 mt-12">
       <div className="flex items-center justify-between px-4">
         <div className="flex items-center gap-2 text-white/40 font-mono text-[10px] uppercase tracking-[0.2em]">
           <History className="w-3 h-3" />
-          Manifestation Gallery
+          {items.length > 0 ? "Manifestation Gallery" : "Sample Manifestations"}
         </div>
         <div className="h-px flex-1 bg-white/5 mx-4" />
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
-        {items.map((item) => (
+        {displayItems.map((item) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, scale: 0.9 }}
@@ -728,15 +734,17 @@ const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onD
               <p className="text-[8px] text-white/60 font-mono">{item.futureChoice}</p>
             </div>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(item.id);
-              }}
-              className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-red-500/80 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300"
-            >
-              <Trash2 className="w-3 h-3 text-white" />
-            </button>
+            {items.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(item.id);
+                }}
+                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-red-500/80 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300"
+              >
+                <Trash2 className="w-3 h-3 text-white" />
+              </button>
+            )}
           </motion.div>
         ))}
       </div>
@@ -2628,11 +2636,11 @@ function AppContent() {
                     setStep("choose-future");
                   }
                 }}
-                disabled={!profile.name || !profile.passion || lives <= 0}
+                disabled={!profile.name || !profile.passion || (lives <= 0 && manifestations.length === 0)}
                 className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="relative z-10 flex items-center">
-                  {hasApiKey === false ? "Initialize Link" : "Accept Call"} 
+                  {lives <= 0 ? "Explore Gallery" : (hasApiKey === false ? "Initialize Link" : "Accept Call")} 
                   <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
                 </span>
               </button>
@@ -3658,6 +3666,20 @@ function AppContent() {
                 >
                   <Download className="w-4 h-4" /> Export Path
                 </button>
+
+                <button 
+                  onClick={() => avatarUploadRef.current?.click()} 
+                  className="flex items-center gap-3 text-[10px] uppercase tracking-[0.4em] text-white/40 hover:text-white transition-colors font-mono"
+                >
+                  <Camera className="w-4 h-4" /> Update Avatar
+                </button>
+                <input 
+                  type="file" 
+                  ref={avatarUploadRef} 
+                  onChange={handleManualAvatarUpload} 
+                  className="hidden" 
+                  accept="image/*" 
+                />
               </div>
             </div>
 
@@ -3797,12 +3819,21 @@ function AppContent() {
                     <div className="flex items-center gap-2">
                       <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Connection</p>
                       <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <p className={cn(
-                        "text-[10px] font-mono uppercase tracking-widest transition-colors",
-                        questionsRemaining <= 1 ? "text-orange-400" : "text-white/40"
-                      )}>
-                        {questionsRemaining} Syncs Left
-                      </p>
+                      <button 
+                        onClick={() => {
+                          const chatText = chatMessages.map(m => `${m.role === 'user' ? 'Past Self' : 'Future Self'}: ${m.text}`).join('\n\n');
+                          const shareText = `[Future Self Conversation]\n\n${chatText}\n\nManifest your own future at ${window.location.origin}`;
+                          if (navigator.share) {
+                            navigator.share({ title: 'Future Self Conversation', text: shareText });
+                          } else {
+                            navigator.clipboard.writeText(shareText);
+                            alert("Conversation copied to clipboard!");
+                          }
+                        }}
+                        className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                      >
+                        <Share2 className="w-3 h-3" /> Share Chat
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3847,12 +3878,26 @@ function AppContent() {
                     )}
                   >
                     <div className={cn(
-                      "px-4 py-3 rounded-2xl text-sm leading-relaxed",
+                      "group relative px-4 py-3 rounded-2xl text-sm leading-relaxed",
                       msg.role === "user" 
                         ? "bg-white text-black rounded-tr-none" 
                         : "bg-white/10 border border-white/10 rounded-tl-none"
                     )}>
                       {msg.text}
+                      <button 
+                        onClick={() => {
+                          const shareText = `[Future Self Manifestation]\n${msg.role === 'user' ? 'Past Self' : 'Future Self'}: ${msg.text}\n\nManifest your own future at ${window.location.origin}`;
+                          if (navigator.share) {
+                            navigator.share({ title: 'Future Self Chat', text: shareText });
+                          } else {
+                            navigator.clipboard.writeText(shareText);
+                            alert("Message copied to clipboard!");
+                          }
+                        }}
+                        className="absolute -right-8 top-1/2 -translate-y-1/2 p-1.5 bg-white/5 hover:bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Share2 className="w-3 h-3 text-white/40" />
+                      </button>
                     </div>
                     {msg.role === "model" && (
                       <button 
