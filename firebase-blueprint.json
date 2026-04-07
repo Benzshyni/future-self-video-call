@@ -26,6 +26,8 @@
         "responseMode": { "type": "string" },
         "imageUrl": { "type": "string", "format": "uri" },
         "videoUrl": { "type": "string", "format": "uri" },
+        "narrative": { "type": "string" },
+        "traits": { "type": "array", "items": { "type": "string" } },
         "contextualObservation": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
       },

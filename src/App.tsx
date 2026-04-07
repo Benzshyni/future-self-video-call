@@ -754,6 +754,15 @@ function App() {
 
 function AppContent() {
   const [user, loading, authError] = useAuthState(auth);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  useEffect(() => {
+    console.log("Auth State Changed:", { user: user?.displayName, loading, error: authError?.message });
+    if (user) {
+      setIsSigningIn(false);
+    }
+  }, [user, loading, authError]);
+
   const [step, setStep] = useState<Step>("entry");
   const [profile, setProfile] = useState<UserProfile>({
     name: "",
@@ -774,7 +783,7 @@ function AppContent() {
   const [timelineIndex, setTimelineIndex] = useState(0);
   
   // Video Call State
-  const [callStep, setCallStep] = useState(0); // 0: Goal, 1: Present, 2: Habit, 3: Closing
+  const [callStep, setCallStep] = useState(-1); // -1: Initial, 0: Greeting, 1: Goal, 2: Present, 3: Habit, 4: Closing
   const [userResponse, setUserResponse] = useState("");
   const [isAITyping, setIsAITyping] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
@@ -838,7 +847,12 @@ function AppContent() {
   // Firebase Sync
   useEffect(() => {
     if (!user) {
-      setLives(3);
+      const savedLives = localStorage.getItem("explow_lives");
+      if (savedLives) {
+        setLives(parseInt(savedLives));
+      } else {
+        setLives(3);
+      }
       setManifestations([]);
       return;
     }
@@ -862,8 +876,11 @@ function AppContent() {
             lastReset: new Date().toISOString()
           }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
           setLives(3);
+          localStorage.setItem("explow_lives", "3");
         } else {
-          setLives(data.lives ?? 3);
+          const syncedLives = data.lives ?? 3;
+          setLives(syncedLives);
+          localStorage.setItem("explow_lives", syncedLives.toString());
         }
       } else {
         setDoc(userDocRef, {
@@ -1666,8 +1683,14 @@ function AppContent() {
     setStep("video-call");
     
     setLives(prev => {
-      const next = prev - 1;
+      const next = Math.max(0, prev - 1);
       localStorage.setItem("explow_lives", next.toString());
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
+        updateDoc(userDocRef, {
+          lives: next
+        }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
+      }
       return next;
     });
     setQuestionsRemaining(4);
@@ -1755,7 +1778,9 @@ function AppContent() {
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
-          ${futureSelf?.contextualObservation ? `Neural Observation of Past Self: "${futureSelf.contextualObservation}". You should mention this observation naturally in your opening greeting.` : ""}
+          
+          CRITICAL VISUAL CONTEXT: ${futureSelf?.contextualObservation ? `You have just observed your past self and noticed: "${futureSelf.contextualObservation}". You MUST mention this observation warmly and naturally in your very first sentence of the conversation.` : "Observe your past self through the temporal link and acknowledge their presence."}
+          
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
           You are currently in a REAL-TIME VOICE CALL with your past self. 
           Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
@@ -2105,18 +2130,17 @@ function AppContent() {
     setGenerationStage("Initializing temporal link...");
     try {
       // Deduct life
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        await updateDoc(userDocRef, {
-          lives: lives - 1
-        });
-      } else {
-        setLives(prev => {
-          const next = Math.max(0, prev - 1);
-          localStorage.setItem("explow_lives", next.toString());
-          return next;
-        });
-      }
+      setLives(prev => {
+        const next = Math.max(0, prev - 1);
+        localStorage.setItem("explow_lives", next.toString());
+        if (user) {
+          const userDocRef = doc(db, "users", user.uid);
+          updateDoc(userDocRef, {
+            lives: next
+          }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
+        }
+        return next;
+      });
 
       const ai = getAI();
       
@@ -2328,6 +2352,8 @@ function AppContent() {
                     responseMode: profile.responseMode,
                     imageUrl: updated.imageUrl || "",
                     videoUrl: updated.videoUrl || "",
+                    narrative: updated.narrative || "",
+                    traits: updated.traits || [],
                     contextualObservation: updated.contextualObservation || "",
                     timestamp: new Date().toISOString()
                   }).catch(err => console.error("Failed to save manifestation:", err));
@@ -2398,13 +2424,58 @@ function AppContent() {
                     </button>
                   </div>
                 ) : (
-                  <button 
-                    onClick={() => signInWithPopup(auth, googleProvider)}
-                    className="flex items-center gap-3 bg-white text-black py-3 px-6 rounded-full font-medium hover:scale-105 transition-all shadow-xl"
-                  >
-                    <LogIn className="w-5 h-5" />
-                    Sign in to Sync Tokens
-                  </button>
+                  <div className="flex flex-col items-center gap-6">
+                    <button 
+                      disabled={loading || isSigningIn}
+                      onClick={async () => {
+                        console.log("Attempting sign-in with popup...");
+                        setIsSigningIn(true);
+                        setCallError(null);
+                        try {
+                          const result = await signInWithPopup(auth, googleProvider);
+                          console.log("Sign-in successful:", result.user.displayName);
+                        } catch (error: any) {
+                          console.error("Sign-in error:", error);
+                          setIsSigningIn(false);
+                          setCallError(
+                            <div className="space-y-2">
+                              <p className="font-bold">Sign-in failed</p>
+                              <p className="text-xs opacity-80">{error?.message || "Please check if popups are blocked in your browser."}</p>
+                              <button 
+                                onClick={() => setStep("choose-future")}
+                                className="mt-2 text-[10px] underline uppercase tracking-widest"
+                              >
+                                Continue as Guest instead
+                              </button>
+                            </div>
+                          );
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 bg-white text-black py-4 px-8 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-2xl",
+                        (loading || isSigningIn) && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {isSigningIn ? (
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <LogIn className="w-5 h-5" />
+                      )}
+                      {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
+                    </button>
+
+                    <div className="flex flex-col items-center gap-2">
+                      <button 
+                        onClick={() => setStep("choose-future")}
+                        className="text-[10px] font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
+                      >
+                        Continue as Guest
+                      </button>
+                      <p className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
+                        Tokens will be saved locally
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -2536,8 +2607,8 @@ function AppContent() {
               onDelete={deleteManifestation}
               onSelect={(m) => {
                 setFutureSelf({
-                  narrative: "",
-                  traits: [],
+                  narrative: m.narrative || "",
+                  traits: m.traits || [],
                   visualDescription: "",
                   gender: "neutral",
                   contextualObservation: m.contextualObservation || "",

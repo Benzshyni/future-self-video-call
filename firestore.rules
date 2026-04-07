@@ -23,6 +23,8 @@ service cloud.firestore {
     //   - responseMode: string
     //   - imageUrl: string
     //   - videoUrl: string
+    //   - narrative: string
+    //   - traits: list
     //   - contextualObservation: string
     //   - timestamp: string (ISO 8601)
     //
@@ -66,7 +68,7 @@ service cloud.firestore {
     }
 
     function isValidManifestation(data) {
-      return hasOnlyAllowedFields(['uid', 'name', 'passion', 'futureChoice', 'responseMode', 'imageUrl', 'videoUrl', 'contextualObservation', 'timestamp']) &&
+      return hasOnlyAllowedFields(['uid', 'name', 'passion', 'futureChoice', 'responseMode', 'imageUrl', 'videoUrl', 'narrative', 'traits', 'contextualObservation', 'timestamp']) &&
              data.uid == request.auth.uid &&
              isValidDateString(data.timestamp);
     }
