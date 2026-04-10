@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, ErrorInfo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, LogOut, LogIn, History, Trash2 } from "lucide-react";
+import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, LogOut, LogIn, History, Trash2, Copy, ShieldAlert } from "lucide-react";
 import { cn } from "./lib/utils";
 import { auth, db, googleProvider } from "./firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -414,7 +414,7 @@ const TemporalGrid = () => (
 );
 
 const StatusBadge = ({ label, value, icon: Icon, color = "text-white/60" }: { label: string; value: string; icon: any; color?: string }) => (
-  <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-xl rounded-full border border-white/10">
+  <div className="flex items-center gap-3 px-4 py-2 liquid-glass rounded-full">
     <div className={cn("p-1.5 rounded-lg bg-white/5", color)}>
       <Icon className="w-3.5 h-3.5" />
     </div>
@@ -458,24 +458,57 @@ const TemporalHUD = () => {
           <span className="opacity-40">Status:</span> <span className="text-green-400/80">Synchronized</span>
         </div>
       </div>
-      
-      <div className="text-right space-y-2">
-        <div className="temporal-hud">
-          <span className="opacity-40">Local Time:</span> <span className="tabular-nums">{time.toLocaleTimeString([], { hour12: false })}</span>
+      <div className="text-right space-y-1">
+        <div className="temporal-hud font-mono">
+          {time.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
-        <div className="temporal-hud flex items-center justify-end gap-3">
-          <span className="opacity-40">Link Strength:</span> 
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className={cn("w-0.5 h-3", i <= 4 ? "bg-white" : "bg-white/20")} />
-            ))}
-          </div>
-          <span className="tabular-nums">98.4%</span>
+        <div className="temporal-hud opacity-40">
+          Ref: {Math.random().toString(36).substring(7).toUpperCase()}
         </div>
       </div>
     </div>
   );
 };
+
+const Navbar = ({ onBegin, user, onSignOut }: { onBegin: () => void; user: any; onSignOut: () => void }) => (
+  <nav className="fixed top-0 left-0 right-0 z-[200] px-8 py-6 max-w-7xl mx-auto flex flex-row justify-between items-center w-full">
+    <div className="text-3xl tracking-tight text-foreground" style={{ fontFamily: "'Instrument Serif', serif" }}>
+      Velorah<sup className="text-xs">®</sup>
+    </div>
+    <div className="hidden md:flex gap-8 items-center">
+      <a href="#" className="text-sm text-foreground">Home</a>
+      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Studio</a>
+      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
+      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Journal</a>
+      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Reach Us</a>
+    </div>
+    <div className="flex items-center gap-4">
+      {user && (
+        <button onClick={onSignOut} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          Sign Out
+        </button>
+      )}
+      <button 
+        onClick={onBegin}
+        className="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03] transition-transform"
+      >
+        Begin Journey
+      </button>
+    </div>
+  </nav>
+);
+
+const BackgroundVideo = () => (
+  <video 
+    autoPlay 
+    loop 
+    muted 
+    playsInline 
+    className="fixed inset-0 w-full h-full object-cover z-0"
+  >
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
+  </video>
+);
 
 const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeaking: boolean; isListening: boolean; isThinking: boolean; volume?: number }) => {
   return (
@@ -554,7 +587,7 @@ const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeak
 
 // --- Sub-components for stability ---
 
-const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, isCameraOn: boolean }) => {
+const UserVideo = memo(({ stream, isCameraOn, selfie }: { stream: MediaStream | null, isCameraOn: boolean, selfie?: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -581,9 +614,18 @@ const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, is
       />
       {!isCameraOn && (
         <div className="absolute inset-0 bg-white/5 flex flex-col items-center justify-center gap-4 z-10">
-          <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
-            <User className="w-10 h-10 text-white/40" />
-          </div>
+          {selfie ? (
+            <img 
+              src={selfie} 
+              alt="Your Avatar" 
+              className="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+              <User className="w-10 h-10 text-white/40" />
+            </div>
+          )}
           <p className="text-xs font-mono uppercase tracking-widest text-white/20">Your Presence</p>
         </div>
       )}
@@ -633,28 +675,19 @@ const FutureVideo = memo(({ videoUrl, isSpeaking, outputVolume }: { videoUrl: st
 
 FutureVideo.displayName = "FutureVideo";
 
-const ProgressIndicator = ({ current, total }: { current: number; total: number }) => {
-  return (
-    <div className="fixed top-24 left-1/2 -translate-x-1/2 flex items-center gap-3 z-[150]">
-      {[...Array(total)].map((_, i) => (
-        <div key={i} className="flex items-center">
-          <motion.div
-            initial={false}
-            animate={{
-              width: i === current ? 40 : 8,
-              backgroundColor: i <= current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)",
-              boxShadow: i === current ? "0 0 15px rgba(255,255,255,0.5)" : "none"
-            }}
-            className="h-1.5 rounded-full transition-all duration-500"
-          />
-          {i < total - 1 && (
-            <div className="w-4 h-px bg-white/5 mx-1" />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-};
+const ProgressIndicator = ({ current, total }: { current: number; total: number }) => (
+  <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3">
+    {Array.from({ length: total }).map((_, i) => (
+      <div 
+        key={i} 
+        className={cn(
+          "h-1 transition-all duration-500 rounded-full",
+          i === current ? "w-12 bg-white" : "w-2 bg-white/20"
+        )} 
+      />
+    ))}
+  </div>
+);
 
 const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: { children: React.ReactNode; title: string; subtitle: string; currentStep: number; totalSteps: number }) => {
   return (
@@ -668,7 +701,8 @@ const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: 
         <motion.h2 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow"
+          className="text-4xl md:text-7xl tracking-tight text-glow"
+          style={{ fontFamily: "'Instrument Serif', serif" }}
         >
           {title}
         </motion.h2>
@@ -697,7 +731,7 @@ const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onD
   const displayItems = items.length > 0 ? items : samples;
 
   return (
-    <div className="space-y-6 mt-12">
+    <div id="gallery" className="space-y-6 mt-12">
       <div className="flex items-center justify-between px-4">
         <div className="flex items-center gap-2 text-white/40 font-mono text-[10px] uppercase tracking-[0.2em]">
           <History className="w-3 h-3" />
@@ -713,7 +747,7 @@ const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onD
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             whileHover={{ y: -5 }}
-            className="group relative aspect-square rounded-2xl overflow-hidden bg-white/5 border border-white/10 cursor-pointer"
+            className="group relative aspect-square rounded-2xl overflow-hidden liquid-glass cursor-pointer"
             onClick={() => onSelect(item)}
           >
             {item.imageUrl ? (
@@ -806,6 +840,7 @@ function AppContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const avatarUploadRef = useRef<HTMLInputElement>(null);
+  const pastSelfUploadRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [callError, setCallError] = useState<React.ReactNode | null>(null);
@@ -851,16 +886,55 @@ function AppContent() {
   const [currentInput, setCurrentInput] = useState("");
 
   const [lives, setLives] = useState(3);
+  const [nextRefillTime, setNextRefillTime] = useState<string | null>(null);
   const [manifestations, setManifestations] = useState<any[]>([]);
+
+  // Calculate next refill time (midnight)
+  const calculateNextRefill = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const diff = tomorrow.getTime() - now.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
+  const shouldResetLives = (lastResetTimestamp: number) => {
+    const lastResetDate = new Date(lastResetTimestamp);
+    const now = new Date();
+    return lastResetDate.toDateString() !== now.toDateString();
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNextRefillTime(calculateNextRefill());
+    }, 60000);
+    setNextRefillTime(calculateNextRefill());
+    return () => clearInterval(timer);
+  }, []);
 
   // Firebase Sync
   useEffect(() => {
     if (!user) {
       const savedLives = localStorage.getItem("explow_lives");
-      if (savedLives) {
-        setLives(parseInt(savedLives));
+      const lastResetStr = localStorage.getItem("explow_last_reset");
+      const now = Date.now();
+      
+      if (lastResetStr) {
+        const lastReset = parseInt(lastResetStr);
+        if (shouldResetLives(lastReset)) {
+          setLives(3);
+          localStorage.setItem("explow_lives", "3");
+          localStorage.setItem("explow_last_reset", now.toString());
+        } else if (savedLives) {
+          setLives(parseInt(savedLives));
+        }
       } else {
         setLives(3);
+        localStorage.setItem("explow_lives", "3");
+        localStorage.setItem("explow_last_reset", now.toString());
       }
       setManifestations([]);
       return;
@@ -877,9 +951,8 @@ function AppContent() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const lastReset = data.lastReset ? new Date(data.lastReset).getTime() : 0;
-        const now = Date.now();
         
-        if (now - lastReset > 24 * 60 * 60 * 1000) {
+        if (shouldResetLives(lastReset)) {
           updateDoc(userDocRef, {
             lives: 3,
             lastReset: new Date().toISOString()
@@ -957,30 +1030,81 @@ function AppContent() {
 
   const [countdown, setCountdown] = useState<number | null>(null);
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+    });
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      setProfile(prev => ({ ...prev, selfie: base64 }));
+      const resized = await resizeImage(base64);
+      setProfile(prev => ({ ...prev, selfie: resized }));
       setStep("transformation");
-      generateFutureSelf(base64);
+      generateFutureSelf(resized);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleManualAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleManualAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      setFutureSelf(prev => prev ? { ...prev, imageUrl: base64 } : null);
+      const resized = await resizeImage(base64);
+      setFutureSelf(prev => prev ? { ...prev, imageUrl: resized } : null);
+      setProfile(prev => ({ ...prev, selfie: resized }));
       setIsGeneratingImage(false);
       setGenerationStage("Avatar manually uploaded.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePastSelfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      const resized = await resizeImage(base64);
+      setProfile(prev => ({ ...prev, selfie: resized }));
+      // Transition to transformation if they upload on entry
+      if (step === "entry") {
+        setStep("transformation");
+        generateFutureSelf(resized);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -1380,8 +1504,8 @@ function AppContent() {
       vibe: "",
       futureChoice: "1-year",
       responseMode: "voice",
-      style: "realistic",
-      avatarType: "caricature"
+      style: "dream-like",
+      gender: "neutral",
     });
     setFutureSelf(null);
     setChatMessages([]);
@@ -1920,26 +2044,54 @@ function AppContent() {
       console.error("Call initialization failed:", err);
       
       let errorMessage: React.ReactNode = "Call failed to start.";
-      if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
+      const isPermissionError = 
+        err.name === "NotAllowedError" || 
+        err.name === "PermissionDeniedError" || 
+        err.message?.toLowerCase().includes("permission denied") ||
+        err.message?.toLowerCase().includes("denied by system");
+
+      if (isPermissionError) {
         errorMessage = (
-          <div className="space-y-4">
-            <p>Camera or Microphone permission denied. Please enable them in your browser settings.</p>
-            <button 
-              onClick={() => {
-                setProfile(prev => ({ ...prev, responseMode: "text" }));
-                setCallError(null);
-                startCall();
-              }}
-              className="text-white underline text-xs"
-            >
-              Switch to Text Mode instead
-            </button>
+          <div className="space-y-6">
+            <div className="flex justify-center">
+              <div className="p-4 rounded-full bg-red-500/10 border border-red-500/20">
+                <ShieldAlert className="w-12 h-12 text-red-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-serif italic text-white">Access Required</h3>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Temporal synchronization requires camera and microphone access. Please enable them in your browser settings to proceed with the voice link.
+              </p>
+            </div>
+            <div className="pt-4 flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  setCallError(null);
+                  startCall();
+                }}
+                className="w-full py-3 bg-white text-black rounded-full text-xs font-bold uppercase tracking-widest hover:scale-[1.02] transition-all"
+              >
+                Try Again
+              </button>
+              <button 
+                onClick={() => {
+                  setProfile(prev => ({ ...prev, responseMode: "text" }));
+                  setCallError(null);
+                  // We don't call startCall immediately to give user a moment to see the change
+                  setTimeout(() => startCall(), 100);
+                }}
+                className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
+              >
+                Switch to Text Mode
+              </button>
+            </div>
           </div>
         );
       } else if (err.name === "NotFoundError") {
-        errorMessage = "No camera or microphone found.";
+        errorMessage = "No camera or microphone found. Please connect a device to use voice mode.";
       } else {
-        errorMessage = err.message || "An unexpected error occurred.";
+        errorMessage = err.message || "An unexpected error occurred during temporal link initialization.";
       }
       
       setCallError(errorMessage);
@@ -2220,17 +2372,18 @@ function AppContent() {
         contents: { parts: textParts },
         config: {
           responseMimeType: "application/json",
+          maxOutputTokens: 2048,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              narrative: { type: Type.STRING },
-              traits: { type: Type.ARRAY, items: { type: Type.STRING } },
-              visualDescription: { type: Type.STRING },
+              narrative: { type: Type.STRING, description: "A concise poetic narrative (1-2 paragraphs)." },
+              traits: { type: Type.ARRAY, items: { type: Type.STRING }, description: "4 key traits." },
+              visualDescription: { type: Type.STRING, description: "Detailed visual description for an image generator." },
               recap: {
                 type: Type.OBJECT,
                 properties: {
-                  summary: { type: Type.STRING },
-                  actionSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  summary: { type: Type.STRING, description: "Concise summary of the journey." },
+                  actionSteps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 actionable steps." },
                 },
                 required: ["summary", "actionSteps"],
               },
@@ -2253,14 +2406,14 @@ function AppContent() {
                   type: Type.OBJECT,
                   properties: {
                     years: { type: Type.NUMBER },
-                    narrative: { type: Type.STRING },
-                    visualDescription: { type: Type.STRING },
+                    narrative: { type: Type.STRING, description: "Short narrative for this stage." },
+                    visualDescription: { type: Type.STRING, description: "Visual description for this stage." },
                   },
                   required: ["years", "narrative", "visualDescription"],
                 },
               },
               gender: { type: Type.STRING, enum: ["male", "female", "neutral"] },
-              contextualObservation: { type: Type.STRING },
+              contextualObservation: { type: Type.STRING, description: "A brief, warm observation about the user's appearance or environment." },
             },
             required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender", "contextualObservation"],
           },
@@ -2272,97 +2425,37 @@ function AppContent() {
       setFutureSelf(updatedFutureSelf);
       setProfile(prev => ({ ...prev, gender: data.gender }));
       
-      // Auto-transition to incoming call after a short delay
-      setTimeout(() => {
-        setGenerationStage("Establishing secure connection...");
-        if (profile.responseMode === "text") {
-          startCall();
-        } else {
-          setStep("incoming-call");
-        }
-        setIsGenerating(false);
-      }, 3000);
-
-      // Save to localStorage
+      // Save to localStorage early
       try {
         localStorage.setItem("explow_profile", JSON.stringify(profile));
         localStorage.setItem("explow_future_self", JSON.stringify(updatedFutureSelf));
       } catch (e) {
-        console.warn("Could not save all data to local storage (likely due to file size).", e);
+        console.warn("Could not save all data to local storage.", e);
       }
       setHasSavedProfile(true);
 
       // 2. Generate Image
       setGenerationStage("Visualizing future manifestation...");
       setIsGeneratingImage(true);
-      try {
-        const imageParts: any[] = [
-          { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
-        ];
-
-        if (currentSelfie) {
-          const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
-          imageParts.push({
-            inlineData: {
-              data: currentSelfie.split(",")[1],
-              mimeType: mimeType
-            }
-          });
-        }
-
-        const imageResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image",
-          contents: { parts: imageParts },
-          config: {
-            imageConfig: {
-              aspectRatio: "1:1",
-            },
-          },
-        });
-
-        let imageFound = false;
-        for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            const imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            setFutureSelf((prev) => {
-              const updated = prev ? { ...prev, imageUrl } : null;
-              if (updated) {
-                try {
-                  localStorage.setItem("explow_future_self", JSON.stringify(updated));
-                } catch (e) {
-                  console.warn("Could not save future self with image to local storage.", e);
-                }
-              }
-              return updated;
-            });
-            imageFound = true;
-            break;
-          }
-        }
-
-        if (!imageFound) {
-          throw new Error("No image data found in response");
-        }
-
-        // 3. Generate Images for other timeline stages
-        for (let i = 0; i < data.timelineStages.length; i++) {
-          const stage = data.timelineStages[i];
-          const stageImageParts: any[] = [
-            { text: `A high-fidelity, photorealistic digital avatar representing this future self at +${stage.years} years: ${stage.visualDescription}. Focus on advanced realistic facial features, age-appropriate skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
+      const generateImage = async (desc: string, selfie: string | undefined) => {
+        try {
+          const imageParts: any[] = [
+            { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${desc}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
           ];
-          if (currentSelfie) {
-            const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
-            stageImageParts.push({
+
+          if (selfie) {
+            const mimeType = selfie.split(";")[0].split(":")[1] || "image/jpeg";
+            imageParts.push({
               inlineData: {
-                data: currentSelfie.split(",")[1],
+                data: selfie.split(",")[1],
                 mimeType: mimeType
               }
             });
           }
 
-          const stageImageResponse = await ai.models.generateContent({
+          const imageResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash-image",
-            contents: { parts: stageImageParts },
+            contents: { parts: imageParts },
             config: {
               imageConfig: {
                 aspectRatio: "1:1",
@@ -2370,36 +2463,59 @@ function AppContent() {
             },
           });
 
-          for (const part of stageImageResponse.candidates?.[0]?.content?.parts || []) {
+          for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
-              const stageImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-              setFutureSelf((prev) => {
-                if (!prev || !prev.timelineStages) return prev;
-                const updatedStages = [...prev.timelineStages];
-                updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
-                const updated = { ...prev, timelineStages: updatedStages };
-                
-                // Save to Firestore if it's the last stage
-                if (i === data.timelineStages.length - 1 && user) {
-                  addDoc(collection(db, "manifestations"), {
-                    uid: user.uid,
-                    name: profile.name,
-                    passion: profile.passion,
-                    futureChoice: profile.futureChoice,
-                    responseMode: profile.responseMode,
-                    imageUrl: updated.imageUrl || "",
-                    videoUrl: updated.videoUrl || "",
-                    narrative: updated.narrative || "",
-                    traits: updated.traits || [],
-                    contextualObservation: updated.contextualObservation || "",
-                    timestamp: new Date().toISOString()
-                  }).catch(err => console.error("Failed to save manifestation:", err));
-                }
-                
-                return updated;
-              });
-              break;
+              return `data:image/png;base64,${part.inlineData.data}`;
             }
+          }
+        } catch (err) {
+          console.error("Image generation error:", err);
+        }
+        return null;
+      };
+
+      try {
+        const mainImageUrl = await generateImage(data.visualDescription, currentSelfie);
+        if (mainImageUrl) {
+          setFutureSelf(prev => prev ? { ...prev, imageUrl: mainImageUrl } : null);
+        } else {
+          // Fallback image
+          const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.passion)}/800/800`;
+          setFutureSelf(prev => prev ? { ...prev, imageUrl: fallbackUrl } : null);
+        }
+
+        // Save to Firestore as soon as we have the main image (or if it fails)
+        if (user) {
+          try {
+            await addDoc(collection(db, "manifestations"), {
+              uid: user.uid,
+              name: profile.name,
+              passion: profile.passion,
+              futureChoice: profile.futureChoice,
+              responseMode: profile.responseMode,
+              imageUrl: mainImageUrl || "",
+              videoUrl: "",
+              narrative: data.narrative || "",
+              traits: data.traits || [],
+              contextualObservation: data.contextualObservation || "",
+              timestamp: new Date().toISOString()
+            });
+          } catch (err) {
+            console.error("Failed to save manifestation to Firestore:", err);
+          }
+        }
+
+        // Generate images for other timeline stages in background
+        for (let i = 0; i < data.timelineStages.length; i++) {
+          const stage = data.timelineStages[i];
+          const stageImageUrl = await generateImage(stage.visualDescription, currentSelfie);
+          if (stageImageUrl) {
+            setFutureSelf(prev => {
+              if (!prev || !prev.timelineStages) return prev;
+              const updatedStages = [...prev.timelineStages];
+              updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
+              return { ...prev, timelineStages: updatedStages };
+            });
           }
         }
       } catch (imageError) {
@@ -2408,6 +2524,17 @@ function AppContent() {
       } finally {
         setIsGeneratingImage(false);
       }
+
+      // Final transition
+      setGenerationStage("Establishing secure connection...");
+      setTimeout(() => {
+        if (profile.responseMode === "text") {
+          startCall();
+        } else {
+          setStep("incoming-call");
+        }
+        setIsGenerating(false);
+      }, 1500);
 
     } catch (error) {
       console.error("Future self generation failed:", error);
@@ -2420,11 +2547,23 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
-      <div className="atmosphere" />
-      <TemporalGrid />
-      <TemporalHUD />
+      <BackgroundVideo />
+      <Navbar 
+        onBegin={() => {
+          if (step === "entry") setStep("choose-future");
+        }} 
+        user={user}
+        onSignOut={() => signOut(auth)}
+      />
+      
+      {step !== "entry" && (
+        <>
+          <TemporalGrid />
+          <TemporalHUD />
+        </>
+      )}
 
-      {["entry", "choose-future", "choose-response", "take-selfie"].includes(step) && (
+      {["choose-future", "choose-response", "take-selfie"].includes(step) && (
         <ProgressIndicator 
           current={
             step === "entry" ? 0 : 
@@ -2437,267 +2576,77 @@ function AppContent() {
 
       <AnimatePresence mode="wait">
         {step === "entry" && (
-          <OnboardingStep
-            key="entry"
-            title="Identity Sync"
-            subtitle="Temporal Link Initialization"
-            currentStep={0}
-            totalSteps={4}
-          >
-            <div className="space-y-8">
-              {/* Auth Header */}
-              <div className="flex justify-center mb-8">
-                {user ? (
-                  <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full py-2 px-4 backdrop-blur-xl">
-                    <img src={user.photoURL || ""} alt={user.displayName || ""} className="w-8 h-8 rounded-full border border-white/20" referrerPolicy="no-referrer" />
-                    <div className="flex flex-col items-start pr-2">
-                      <span className="text-[10px] font-mono text-white/40 leading-none mb-1">Authenticated</span>
-                      <span className="text-xs font-medium text-white/80 leading-none">{user.displayName}</span>
-                    </div>
-                    <button 
-                      onClick={() => signOut(auth)}
-                      className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="flex flex-col items-center gap-4">
-                      <button 
-                        disabled={isSigningIn}
-                        onClick={async () => {
-                          console.log("Manual sign-in trigger. Auth state:", { loading, user: !!user });
-                          setIsSigningIn(true);
-                          setCallError(null);
-                          try {
-                            const result = await signInWithPopup(auth, googleProvider);
-                            console.log("Sign-in successful:", result.user.displayName);
-                            setIsSigningIn(false);
-                          } catch (error: any) {
-                            console.error("Sign-in error:", error);
-                            setIsSigningIn(false);
-                            
-                            let errorMsg = error?.message || "Unknown error";
-                            if (error?.code === "auth/popup-blocked") {
-                              errorMsg = "The sign-in popup was blocked by your browser. Please allow popups for this site.";
-                            } else if (error?.code === "auth/unauthorized-domain") {
-                              errorMsg = "This domain is not authorized for Firebase Auth. Please add it to the 'Authorized domains' list in the Firebase Console.";
-                            }
+          <div className="w-full">
+            <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-32 pb-40 py-[90px] min-h-screen w-full">
+              <h1 
+                className="text-5xl sm:text-7xl md:text-8xl leading-[0.95] tracking-[-2.46px] max-w-7xl font-normal animate-fade-rise"
+                style={{ fontFamily: "'Instrument Serif', serif" }}
+              >
+                Where <em className="not-italic text-muted-foreground">dreams</em> rise <em className="not-italic text-muted-foreground">through the silence.</em>
+              </h1>
+              <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mt-8 leading-relaxed animate-fade-rise-delay">
+                We're designing tools for deep thinkers, bold creators, and quiet rebels. Amid the chaos, we build digital spaces for sharp focus and inspired work.
+              </p>
+              
+              <div className="flex flex-col items-center gap-8 mt-12 animate-fade-rise-delay-2">
+                <button 
+                  onClick={() => setStep("choose-future")}
+                  className="liquid-glass rounded-full px-14 py-5 text-base text-foreground hover:scale-[1.03] cursor-pointer transition-transform"
+                >
+                  Begin Journey
+                </button>
 
-                            setCallError(
-                              <div className="space-y-3">
-                                <p className="font-bold text-red-400">Sign-in failed</p>
-                                <p className="text-xs opacity-80 leading-relaxed">{errorMsg}</p>
-                                <div className="flex flex-col gap-2 pt-2">
-                                  <button 
-                                    onClick={() => setStep("choose-future")}
-                                    className="text-[10px] underline uppercase tracking-widest text-white/60 hover:text-white"
-                                  >
-                                    Continue as Guest instead
-                                  </button>
-                                  <button 
-                                    onClick={() => signOut(auth).then(() => window.location.reload())}
-                                    className="text-[10px] underline uppercase tracking-widest text-white/60 hover:text-white"
-                                  >
-                                    Reset Auth & Reload
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          }
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 bg-white text-black py-4 px-8 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-2xl",
-                          isSigningIn && "opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        {isSigningIn ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <LogIn className="w-5 h-5" />
-                        )}
-                        {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
-                      </button>
-
-                      <div className="flex flex-col items-center gap-2">
-                        <button 
-                          onClick={() => setStep("choose-future")}
-                          className="text-[10px] font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
-                        >
-                          Continue as Guest
-                        </button>
-                        <p className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
-                          Tokens will be saved locally
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Debug Auth Info (Small) */}
-                    <div className="pt-4 flex flex-col items-center gap-1 opacity-20 hover:opacity-100 transition-opacity">
-                      <p className="text-[8px] font-mono uppercase tracking-widest">
-                        Auth Status: {loading ? "Initializing..." : user ? "Authenticated" : "Idle"}
-                      </p>
-                      {authError && (
-                        <p className="text-[8px] font-mono text-red-400 uppercase tracking-widest">
-                          Init Error: {(authError as any).code || "Unknown"}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                {!user && (
+                  <button 
+                    disabled={isSigningIn}
+                    onClick={async () => {
+                      setIsSigningIn(true);
+                      try {
+                        await signInWithPopup(auth, googleProvider);
+                        setIsSigningIn(false);
+                      } catch (error) {
+                        console.error(error);
+                        setIsSigningIn(false);
+                      }
+                    }}
+                    className="text-xs font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
+                  >
+                    {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
+                  </button>
                 )}
               </div>
-
-              {callError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm mb-8 backdrop-blur-xl"
-                >
-                  {callError}
-                </motion.div>
-              )}
-              
-              <div className="relative">
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    opacity: [0.2, 0.4, 0.2]
-                  }}
-                  transition={{ duration: 6, repeat: Infinity }}
-                  className="w-48 h-48 bg-white/10 rounded-full mx-auto blur-3xl absolute left-1/2 -translate-x-1/2 -top-12"
-                />
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="relative"
-                >
-                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9] text-center">
-                    Your future self <br /> 
-                    <span className="text-white/40">is calling.</span>
-                  </h1>
-                </motion.div>
-              </div>
-              
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="max-w-sm mx-auto space-y-4 pt-8"
-              >
-                <div className="relative group">
-                  <input
-                    type="text"
-                    placeholder="Your Name"
-                    value={profile.name}
-                    onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
-                  />
-                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
-                </div>
-                <div className="relative group">
-                  <input
-                    type="text"
-                    placeholder="Your Passion (e.g. Art, Tech, Nature)"
-                    value={profile.passion}
-                    onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
-                  />
-                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
-                </div>
-              </motion.div>
-
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
-                className="text-white/30 font-mono uppercase tracking-[0.6em] text-[9px] pt-4 flex flex-col items-center gap-2"
-              >
-                <div>Temporal Link Status: <span className="text-white/60">Ready</span></div>
-                <div className="flex items-center gap-2">
-                  <Heart className={cn("w-3 h-3", lives === 0 ? "text-red-500" : "text-white/40")} />
-                  <span>{lives} / 3 Daily Tokens Available</span>
-                </div>
-              </motion.div>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="flex flex-col items-center gap-6"
-            >
-              <button
-                onClick={async () => {
-                  if (hasApiKey === false) {
-                    await openKeySelection();
-                  } else {
-                    setStep("choose-future");
-                  }
+            {/* Gallery Section */}
+            <div className="max-w-7xl mx-auto px-6 pb-32">
+              <ManifestationGallery 
+                items={manifestations} 
+                onDelete={deleteManifestation}
+                onSelect={(m) => {
+                  setFutureSelf({
+                    narrative: m.narrative || "",
+                    traits: m.traits || [],
+                    visualDescription: "",
+                    gender: "neutral",
+                    contextualObservation: m.contextualObservation || "",
+                    recap: { summary: "", actionSteps: [] },
+                    hotspots: [],
+                    timelineStages: [],
+                    imageUrl: m.imageUrl,
+                    videoUrl: m.videoUrl
+                  });
+                  setProfile(prev => ({
+                    ...prev,
+                    name: m.name,
+                    passion: m.passion,
+                    futureChoice: m.futureChoice,
+                    responseMode: m.responseMode
+                  }));
+                  setStep("incoming-call");
                 }}
-                disabled={!profile.name || !profile.passion || (lives <= 0 && manifestations.length === 0)}
-                className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="relative z-10 flex items-center">
-                  {lives <= 0 ? "Explore Gallery" : (hasApiKey === false ? "Initialize Link" : "Accept Call")} 
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
-                </span>
-              </button>
-
-              <div className="flex flex-col items-center gap-4">
-                {hasApiKey === false && (
-                  <p className="text-white/30 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed text-center">
-                    A paid Gemini API key is required to synthesize temporal video data.
-                  </p>
-                )}
-
-                <div className="flex items-center gap-6">
-                  {hasSavedProfile && (
-                    <button
-                      onClick={() => setStep("takeaway")}
-                      className="text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
-                    >
-                      View Previous Reflection
-                    </button>
-                  )}
-                  <button
-                    onClick={clearSavedData}
-                    className="text-red-500/40 hover:text-red-500 transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-red-500/10 pb-1"
-                  >
-                    Start Fresh
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-
-            <ManifestationGallery 
-              items={manifestations} 
-              onDelete={deleteManifestation}
-              onSelect={(m) => {
-                setFutureSelf({
-                  narrative: m.narrative || "",
-                  traits: m.traits || [],
-                  visualDescription: "",
-                  gender: "neutral",
-                  contextualObservation: m.contextualObservation || "",
-                  recap: { summary: "", actionSteps: [] },
-                  hotspots: [],
-                  timelineStages: [],
-                  imageUrl: m.imageUrl,
-                  videoUrl: m.videoUrl
-                });
-                setProfile(prev => ({
-                  ...prev,
-                  name: m.name,
-                  passion: m.passion,
-                  futureChoice: m.futureChoice,
-                  responseMode: m.responseMode
-                }));
-                setStep("takeaway");
-              }}
-            />
-          </OnboardingStep>
+              />
+            </div>
+          </div>
         )}
 
         {step === "choose-future" && (
@@ -2720,10 +2669,10 @@ function AppContent() {
                     setProfile(prev => ({ ...prev, futureChoice: opt.id as any }));
                   }}
                   className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.futureChoice === opt.id 
-                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
+                      ? "bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
+                      : "liquid-glass text-white hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
@@ -2733,13 +2682,12 @@ function AppContent() {
                     {opt.icon}
                   </div>
                   <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
+                    <p className="font-medium text-lg md:text-xl leading-tight" style={{ fontFamily: "'Instrument Serif', serif" }}>{opt.label}</p>
                     <p className={cn(
                       "text-xs md:text-sm leading-relaxed",
                       profile.futureChoice === opt.id ? "text-black/60" : "text-white/40"
                     )}>{opt.desc}</p>
                   </div>
-                  
                   <div className={cn(
                     "absolute bottom-0 left-0 h-1 bg-current transition-all duration-500",
                     profile.futureChoice === opt.id ? "w-full" : "w-0 group-hover:w-12"
@@ -2751,7 +2699,7 @@ function AppContent() {
             <div className="flex justify-center gap-6 pt-8">
               <button
                 onClick={() => setStep("entry")}
-                className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
               >
                 Back
               </button>
@@ -2784,10 +2732,10 @@ function AppContent() {
                     setProfile(prev => ({ ...prev, responseMode: opt.id as any }));
                   }}
                   className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.responseMode === opt.id 
-                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
+                      ? "bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
+                      : "liquid-glass text-white hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
@@ -2797,7 +2745,7 @@ function AppContent() {
                     {opt.icon}
                   </div>
                   <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
+                    <p className="font-medium text-lg md:text-xl leading-tight" style={{ fontFamily: "'Instrument Serif', serif" }}>{opt.label}</p>
                     <p className={cn(
                       "text-xs md:text-sm leading-relaxed",
                       profile.responseMode === opt.id ? "text-black/60" : "text-white/40"
@@ -2810,7 +2758,7 @@ function AppContent() {
             <div className="flex justify-center gap-6 pt-8">
               <button
                 onClick={() => setStep("choose-future")}
-                className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
               >
                 Back
               </button>
@@ -2841,7 +2789,7 @@ function AppContent() {
             currentStep={3}
             totalSteps={4}
           >
-            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
+            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden liquid-glass group shadow-2xl">
               {stream ? (
                 <>
                   <video
@@ -2924,7 +2872,7 @@ function AppContent() {
                 <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
                   <button
                     onClick={() => setStep("choose-response")}
-                    className="w-full md:w-auto px-8 py-6 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                    className="w-full md:w-auto px-8 py-6 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
                   >
                     Back
                   </button>
@@ -2937,7 +2885,7 @@ function AppContent() {
                   </button>
                   <button
                     onClick={skipSelfie}
-                    className="w-full md:w-auto px-12 py-6 bg-white/5 border border-white/10 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                    className="w-full md:w-auto px-12 py-6 liquid-glass rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
                   >
                     Skip
                   </button>
@@ -2947,7 +2895,7 @@ function AppContent() {
                   <div className="flex gap-4">
                     <button
                       onClick={() => setStep("choose-response")}
-                      className="px-8 py-5 bg-white/5 border border-white/10 text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                      className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
                     >
                       Back
                     </button>
@@ -3198,7 +3146,9 @@ function AppContent() {
                       )}
                     </div>
                     <div>
-                      <h3 className="text-xl font-serif italic">{profile.name} <span className="text-white/40">Manifestation</span></h3>
+                      <h3 className="text-xl font-serif italic" style={{ fontFamily: "'Instrument Serif', serif" }}>
+                        {profile.name} <span className="text-white/40">Manifestation</span>
+                      </h3>
                       <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Neural Link Active</p>
                     </div>
                   </div>
@@ -3209,6 +3159,23 @@ function AppContent() {
                       className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/60 transition-all"
                     >
                       Home
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const chatText = chatMessages.map(m => `${m.role === 'user' ? 'Past Self' : 'Future Self'}: ${m.text}`).join('\n\n');
+                        navigator.clipboard.writeText(chatText);
+                      }} 
+                      className="p-3 bg-white/5 text-white/60 rounded-full hover:bg-white/10 transition-all"
+                      title="Copy Chat History"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)} 
+                      className="p-3 bg-white/5 text-white/60 rounded-full hover:bg-white/10 transition-all"
+                      title="Share Manifestation"
+                    >
+                      <Share2 className="w-5 h-5" />
                     </button>
                     <button onClick={endCall} className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500/20 transition-all">
                       <PhoneOff className="w-5 h-5" />
@@ -3229,12 +3196,22 @@ function AppContent() {
                       )}
                     >
                       <div className={cn(
-                        "px-6 py-4 rounded-2xl text-lg leading-relaxed",
+                        "px-6 py-4 rounded-2xl text-lg leading-relaxed relative group/msg",
                         msg.role === "user" 
                           ? "bg-white text-black rounded-tr-none" 
-                          : "bg-white/5 border border-white/10 rounded-tl-none text-white/90"
+                          : "liquid-glass rounded-tl-none text-white/90"
                       )}>
                         {msg.text}
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.text);
+                            // Maybe add a toast here
+                          }}
+                          className="absolute -right-12 top-1/2 -translate-y-1/2 p-2 bg-white/5 rounded-full opacity-0 group-hover/msg:opacity-100 transition-opacity hover:bg-white/10"
+                          title="Copy message"
+                        >
+                          <Copy className="w-3 h-3 text-white/40" />
+                        </button>
                       </div>
                       <span className="text-[9px] font-mono uppercase tracking-widest text-white/20 mt-2">
                         {msg.role === "user" ? "Past Self" : "Future Self"}
@@ -3258,7 +3235,7 @@ function AppContent() {
                     onChange={(e) => setUserResponse(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
                     placeholder="Message your future self..."
-                    className="w-full bg-white/5 border border-white/10 rounded-full py-6 px-10 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-lg"
+                    className="w-full liquid-glass rounded-full py-6 px-10 focus:outline-none focus:bg-white/5 transition-all text-lg"
                   />
                   <button
                     onClick={() => handleNextCallStep(userResponse)}
@@ -3277,18 +3254,25 @@ function AppContent() {
                   animate={{ x: 0, opacity: 1 }}
                   className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
                 >
-                  <UserVideo stream={userStream} isCameraOn={isCameraOn} />
+                  <UserVideo stream={userStream} isCameraOn={isCameraOn} selfie={profile.selfie} />
                   
                   {/* HUD Elements for User */}
                   <div className="absolute top-8 left-8 z-20 space-y-4">
                     <StatusBadge label="Identity" value="Past Self" icon={User} />
                     <StatusBadge label="Location" value="Present Day" icon={Clock} />
-                    <StatusBadge 
-                      label="Temporal Energy" 
-                      value={`${lives} Tokens Left`} 
-                      icon={Heart} 
-                      color={lives === 1 ? "text-red-400" : "text-white/60"}
-                    />
+                    <div className="space-y-1">
+                      <StatusBadge 
+                        label="Temporal Energy" 
+                        value={`${lives} Tokens Left`} 
+                        icon={Heart} 
+                        color={lives <= 1 ? "text-red-400" : "text-white/60"}
+                      />
+                      {lives < 3 && (
+                        <p className="pl-5 text-[8px] font-mono uppercase tracking-widest text-white/20">
+                          Refill: {nextRefillTime}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
 
@@ -3432,7 +3416,7 @@ function AppContent() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="p-8 glass-card max-w-md border-red-500/30"
                     >
-                      <p className="text-red-400 font-medium mb-6">{callError}</p>
+                      <div className="text-red-400 font-medium mb-6">{callError}</div>
                       <button 
                         onClick={endCall}
                         className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
@@ -3454,6 +3438,7 @@ function AppContent() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="text-2xl font-serif italic tracking-tight text-white/90"
+                        style={{ fontFamily: "'Instrument Serif', serif" }}
                       >
                         {profile.name} <span className="text-white/40">Manifestation</span>
                       </motion.h2>
@@ -3499,7 +3484,7 @@ function AppContent() {
             {/* Call Controls Bar (Only for Voice Mode) */}
             {profile.responseMode === "voice" && (
               <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
-                <div className="flex items-center gap-6 bg-black/60 backdrop-blur-2xl border border-white/10 p-3 rounded-full shadow-2xl">
+                <div className="flex items-center gap-6 liquid-glass p-3 rounded-full shadow-2xl">
                   <button
                     onClick={toggleMute}
                     className={cn(
