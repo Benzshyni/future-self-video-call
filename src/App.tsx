@@ -6,63 +6,8 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, ErrorInfo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, LogOut, LogIn, History, Trash2, Copy, ShieldAlert } from "lucide-react";
+import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music } from "lucide-react";
 import { cn } from "./lib/utils";
-import { auth, db, googleProvider } from "./firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
 
 declare global {
   interface Window {
@@ -146,7 +91,6 @@ interface FutureSelf {
   traits: string[];
   visualDescription: string;
   gender: "male" | "female" | "neutral";
-  contextualObservation?: string;
   imageUrl?: string;
   videoUrl?: string;
   recap?: {
@@ -414,7 +358,7 @@ const TemporalGrid = () => (
 );
 
 const StatusBadge = ({ label, value, icon: Icon, color = "text-white/60" }: { label: string; value: string; icon: any; color?: string }) => (
-  <div className="flex items-center gap-3 px-4 py-2 liquid-glass rounded-full">
+  <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-xl rounded-full border border-white/10">
     <div className={cn("p-1.5 rounded-lg bg-white/5", color)}>
       <Icon className="w-3.5 h-3.5" />
     </div>
@@ -458,57 +402,24 @@ const TemporalHUD = () => {
           <span className="opacity-40">Status:</span> <span className="text-green-400/80">Synchronized</span>
         </div>
       </div>
-      <div className="text-right space-y-1">
-        <div className="temporal-hud font-mono">
-          {time.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      
+      <div className="text-right space-y-2">
+        <div className="temporal-hud">
+          <span className="opacity-40">Local Time:</span> <span className="tabular-nums">{time.toLocaleTimeString([], { hour12: false })}</span>
         </div>
-        <div className="temporal-hud opacity-40">
-          Ref: {Math.random().toString(36).substring(7).toUpperCase()}
+        <div className="temporal-hud flex items-center justify-end gap-3">
+          <span className="opacity-40">Link Strength:</span> 
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className={cn("w-0.5 h-3", i <= 4 ? "bg-white" : "bg-white/20")} />
+            ))}
+          </div>
+          <span className="tabular-nums">98.4%</span>
         </div>
       </div>
     </div>
   );
 };
-
-const Navbar = ({ onBegin, user, onSignOut }: { onBegin: () => void; user: any; onSignOut: () => void }) => (
-  <nav className="fixed top-0 left-0 right-0 z-[200] px-8 py-6 max-w-7xl mx-auto flex flex-row justify-between items-center w-full">
-    <div className="text-3xl tracking-tight text-foreground" style={{ fontFamily: "'Instrument Serif', serif" }}>
-      Velorah<sup className="text-xs">®</sup>
-    </div>
-    <div className="hidden md:flex gap-8 items-center">
-      <a href="#" className="text-sm text-foreground">Home</a>
-      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Studio</a>
-      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
-      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Journal</a>
-      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Reach Us</a>
-    </div>
-    <div className="flex items-center gap-4">
-      {user && (
-        <button onClick={onSignOut} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-          Sign Out
-        </button>
-      )}
-      <button 
-        onClick={onBegin}
-        className="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03] transition-transform"
-      >
-        Begin Journey
-      </button>
-    </div>
-  </nav>
-);
-
-const BackgroundVideo = () => (
-  <video 
-    autoPlay 
-    loop 
-    muted 
-    playsInline 
-    className="fixed inset-0 w-full h-full object-cover z-0"
-  >
-    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
-  </video>
-);
 
 const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeaking: boolean; isListening: boolean; isThinking: boolean; volume?: number }) => {
   return (
@@ -587,7 +498,7 @@ const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeak
 
 // --- Sub-components for stability ---
 
-const UserVideo = memo(({ stream, isCameraOn, selfie }: { stream: MediaStream | null, isCameraOn: boolean, selfie?: string }) => {
+const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, isCameraOn: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -614,18 +525,9 @@ const UserVideo = memo(({ stream, isCameraOn, selfie }: { stream: MediaStream | 
       />
       {!isCameraOn && (
         <div className="absolute inset-0 bg-white/5 flex flex-col items-center justify-center gap-4 z-10">
-          {selfie ? (
-            <img 
-              src={selfie} 
-              alt="Your Avatar" 
-              className="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-2xl"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
-              <User className="w-10 h-10 text-white/40" />
-            </div>
-          )}
+          <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+            <User className="w-10 h-10 text-white/40" />
+          </div>
           <p className="text-xs font-mono uppercase tracking-widest text-white/20">Your Presence</p>
         </div>
       )}
@@ -675,118 +577,7 @@ const FutureVideo = memo(({ videoUrl, isSpeaking, outputVolume }: { videoUrl: st
 
 FutureVideo.displayName = "FutureVideo";
 
-const ProgressIndicator = ({ current, total }: { current: number; total: number }) => (
-  <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3">
-    {Array.from({ length: total }).map((_, i) => (
-      <div 
-        key={i} 
-        className={cn(
-          "h-1 transition-all duration-500 rounded-full",
-          i === current ? "w-12 bg-white" : "w-2 bg-white/20"
-        )} 
-      />
-    ))}
-  </div>
-);
-
-const OnboardingStep = ({ children, title, subtitle, currentStep, totalSteps }: { children: React.ReactNode; title: string; subtitle: string; currentStep: number; totalSteps: number }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-4xl mx-auto space-y-12 relative z-10"
-    >
-      <div className="text-center space-y-4">
-        <motion.h2 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-7xl tracking-tight text-glow"
-          style={{ fontFamily: "'Instrument Serif', serif" }}
-        >
-          {title}
-        </motion.h2>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]"
-        >
-          {subtitle}
-        </motion.p>
-      </div>
-      
-      {children}
-    </motion.div>
-  );
-};
-
-const ManifestationGallery = ({ items, onDelete, onSelect }: { items: any[], onDelete: (id: string) => void, onSelect: (item: any) => void }) => {
-  const samples = [
-    { id: 'sample-1', name: 'Aria', passion: 'Digital Art', futureChoice: '5-years', narrative: 'A world-renowned digital artist pushing the boundaries of VR.', traits: ['Visionary', 'Creative', 'Resilient'], contextualObservation: 'The light in your studio is perfect for creation.', imageUrl: 'https://picsum.photos/seed/aria/800/800' },
-    { id: 'sample-2', name: 'Leo', passion: 'Sustainable Tech', futureChoice: '1-year', narrative: 'Leading a startup that revolutionizes carbon capture.', traits: ['Innovative', 'Driven', 'Empathetic'], contextualObservation: 'Your focus is inspiring.', imageUrl: 'https://picsum.photos/seed/leo/800/800' },
-    { id: 'sample-3', name: 'Maya', passion: 'Ocean Conservation', futureChoice: 'goal-achieved', narrative: 'Successfully restored a coral reef ecosystem.', traits: ['Protector', 'Wise', 'Calm'], contextualObservation: 'The ocean waves are calling you.', imageUrl: 'https://picsum.photos/seed/maya/800/800' },
-  ];
-
-  const displayItems = items.length > 0 ? items : samples;
-
-  return (
-    <div id="gallery" className="space-y-6 mt-12">
-      <div className="flex items-center justify-between px-4">
-        <div className="flex items-center gap-2 text-white/40 font-mono text-[10px] uppercase tracking-[0.2em]">
-          <History className="w-3 h-3" />
-          {items.length > 0 ? "Manifestation Gallery" : "Sample Manifestations"}
-        </div>
-        <div className="h-px flex-1 bg-white/5 mx-4" />
-      </div>
-      
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
-        {displayItems.map((item) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ y: -5 }}
-            className="group relative aspect-square rounded-2xl overflow-hidden liquid-glass cursor-pointer"
-            onClick={() => onSelect(item)}
-          >
-            {item.imageUrl ? (
-              <img 
-                src={item.imageUrl} 
-                alt={item.name} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white/20" />
-              </div>
-            )}
-            
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-              <p className="text-[10px] font-medium text-white truncate">{item.name}</p>
-              <p className="text-[8px] text-white/60 font-mono">{item.futureChoice}</p>
-            </div>
-
-            {items.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(item.id);
-                }}
-                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-red-500/80 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300"
-              >
-                <Trash2 className="w-3 h-3 text-white" />
-              </button>
-            )}
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-function App() {
+export default function App() {
   return (
     <ErrorBoundary>
       <AppContent />
@@ -795,16 +586,6 @@ function App() {
 }
 
 function AppContent() {
-  const [user, loading, authError] = useAuthState(auth);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-
-  useEffect(() => {
-    console.log("Auth State Changed:", { user: user?.displayName, loading, error: authError?.message });
-    if (user) {
-      setIsSigningIn(false);
-    }
-  }, [user, loading, authError]);
-
   const [step, setStep] = useState<Step>("entry");
   const [profile, setProfile] = useState<UserProfile>({
     name: "",
@@ -825,7 +606,7 @@ function AppContent() {
   const [timelineIndex, setTimelineIndex] = useState(0);
   
   // Video Call State
-  const [callStep, setCallStep] = useState(-1); // -1: Initial, 0: Greeting, 1: Goal, 2: Present, 3: Habit, 4: Closing
+  const [callStep, setCallStep] = useState(0); // 0: Goal, 1: Present, 2: Habit, 3: Closing
   const [userResponse, setUserResponse] = useState("");
   const [isAITyping, setIsAITyping] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
@@ -839,8 +620,6 @@ function AppContent() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const avatarUploadRef = useRef<HTMLInputElement>(null);
-  const pastSelfUploadRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [callError, setCallError] = useState<React.ReactNode | null>(null);
@@ -874,119 +653,27 @@ function AppContent() {
   const [videoProgressPercent, setVideoProgressPercent] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
   const isVideoGenerationCancelledRef = useRef(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatMessages]);
-
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
 
-  const [lives, setLives] = useState(3);
-  const [nextRefillTime, setNextRefillTime] = useState<string | null>(null);
-  const [manifestations, setManifestations] = useState<any[]>([]);
-
-  // Calculate next refill time (midnight)
-  const calculateNextRefill = () => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    const diff = tomorrow.getTime() - now.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const shouldResetLives = (lastResetTimestamp: number) => {
-    const lastResetDate = new Date(lastResetTimestamp);
-    const now = new Date();
-    return lastResetDate.toDateString() !== now.toDateString();
-  };
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNextRefillTime(calculateNextRefill());
-    }, 60000);
-    setNextRefillTime(calculateNextRefill());
-    return () => clearInterval(timer);
-  }, []);
-
-  // Firebase Sync
-  useEffect(() => {
-    if (!user) {
-      const savedLives = localStorage.getItem("explow_lives");
-      const lastResetStr = localStorage.getItem("explow_last_reset");
-      const now = Date.now();
-      
-      if (lastResetStr) {
-        const lastReset = parseInt(lastResetStr);
-        if (shouldResetLives(lastReset)) {
-          setLives(3);
-          localStorage.setItem("explow_lives", "3");
-          localStorage.setItem("explow_last_reset", now.toString());
-        } else if (savedLives) {
-          setLives(parseInt(savedLives));
-        }
-      } else {
-        setLives(3);
+  const [lives, setLives] = useState(() => {
+    const saved = localStorage.getItem("explow_lives");
+    const lastReset = localStorage.getItem("explow_last_reset");
+    const now = Date.now();
+    
+    if (lastReset) {
+      const timePassed = now - parseInt(lastReset);
+      if (timePassed > 24 * 60 * 60 * 1000) {
         localStorage.setItem("explow_lives", "3");
         localStorage.setItem("explow_last_reset", now.toString());
+        return 3;
       }
-      setManifestations([]);
-      return;
+    } else {
+      localStorage.setItem("explow_last_reset", now.toString());
     }
-
-    const userDocRef = doc(db, "users", user.uid);
-    const manifestationsQuery = query(
-      collection(db, "manifestations"),
-      where("uid", "==", user.uid),
-      orderBy("timestamp", "desc")
-    );
-
-    const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const lastReset = data.lastReset ? new Date(data.lastReset).getTime() : 0;
-        
-        if (shouldResetLives(lastReset)) {
-          updateDoc(userDocRef, {
-            lives: 3,
-            lastReset: new Date().toISOString()
-          }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
-          setLives(3);
-          localStorage.setItem("explow_lives", "3");
-        } else {
-          const syncedLives = data.lives ?? 3;
-          setLives(syncedLives);
-          localStorage.setItem("explow_lives", syncedLives.toString());
-        }
-      } else {
-        setDoc(userDocRef, {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          lives: 3,
-          lastReset: new Date().toISOString()
-        }).catch(e => handleFirestoreError(e, OperationType.CREATE, `users/${user.uid}`));
-        setLives(3);
-      }
-    }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}`));
-
-    const unsubscribeManifestations = onSnapshot(manifestationsQuery, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setManifestations(docs);
-    }, (e) => handleFirestoreError(e, OperationType.GET, "manifestations"));
-
-    return () => {
-      unsubscribeUser();
-      unsubscribeManifestations();
-    };
-  }, [user]);
+    
+    return saved ? parseInt(saved) : 3;
+  });
 
   const [questionsRemaining, setQuestionsRemaining] = useState(4);
 
@@ -997,19 +684,9 @@ function AppContent() {
       if (videoRef.current) {
         videoRef.current.srcObject = s;
       }
-      setCallError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error accessing camera:", err);
-      if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
-        setCallError(
-          <div className="space-y-4">
-            <p>Camera permission was denied. Please enable it in your browser settings to use the temporal mirror.</p>
-            <p className="text-[10px] opacity-60">Look for a camera icon in your address bar to reset permissions.</p>
-          </div>
-        );
-      } else {
-        setCallError("Could not access camera. Please check your connection.");
-      }
+      setCallError("Could not access camera. Please check permissions.");
     }
   };
 
@@ -1029,85 +706,6 @@ function AppContent() {
   };
 
   const [countdown, setCountdown] = useState<number | null>(null);
-
-  const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64Str;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      };
-    });
-  };
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const resized = await resizeImage(base64);
-      setProfile(prev => ({ ...prev, selfie: resized }));
-      setStep("transformation");
-      generateFutureSelf(resized);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleManualAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const resized = await resizeImage(base64);
-      setFutureSelf(prev => prev ? { ...prev, imageUrl: resized } : null);
-      setProfile(prev => ({ ...prev, selfie: resized }));
-      setIsGeneratingImage(false);
-      setGenerationStage("Avatar manually uploaded.");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePastSelfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const resized = await resizeImage(base64);
-      setProfile(prev => ({ ...prev, selfie: resized }));
-      // Transition to transformation if they upload on entry
-      if (step === "entry") {
-        setStep("transformation");
-        generateFutureSelf(resized);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const startCountdown = () => {
     setCountdown(3);
@@ -1203,10 +801,10 @@ function AppContent() {
     setCallStep(nextStep);
     setIsAITyping(true);
     
-    const history = [...chatMessages];
+    const history = [...chatHistory];
     if (response) {
       history.push({ role: "user", text: response });
-      setChatMessages(history);
+      setChatHistory(history);
       setQuestionsRemaining(prev => prev - 1);
     }
 
@@ -1217,7 +815,7 @@ function AppContent() {
       User's response: ${response || "None"}.
       
       Based on the step, ask the next question or give a closing reflection.
-      Step 0: Greet your past self for the first time and introduce the temporal manifestation. ${futureSelf?.contextualObservation ? `Start by gently acknowledging their current environment or appearance: "${futureSelf.contextualObservation}".` : ""}
+      Step 0: Greet your past self for the first time and introduce the temporal manifestation.
       Step 1: Ask about their biggest goal.
       Step 2: Ask how they feel about their progress today.
       Step 3: Ask what one small habit they can start tomorrow.
@@ -1227,13 +825,13 @@ function AppContent() {
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: history.map(m => ({ role: m.role, parts: [{ text: m.text }] })).concat([{ role: "user", parts: [{ text: prompt }] }]),
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
 
       const aiText = result.text;
       setAiMessage(aiText);
       history.push({ role: "model", text: aiText });
-      setChatMessages(history);
+      setChatHistory(history);
       
       if (profile.responseMode === "voice") {
         handleSpeak(aiText);
@@ -1498,30 +1096,10 @@ function AppContent() {
   const clearSavedData = () => {
     localStorage.removeItem("explow_profile");
     localStorage.removeItem("explow_future_self");
-    setProfile({
-      name: "",
-      passion: "",
-      vibe: "",
-      futureChoice: "1-year",
-      responseMode: "voice",
-      style: "dream-like",
-      gender: "neutral",
-    });
+    setProfile(prev => ({ ...prev, name: "", passion: "", vibe: "", avatarType: "caricature" }));
     setFutureSelf(null);
-    setChatMessages([]);
-    setChatHistory([]);
-    setChatSession(null);
-    setStep("entry");
     setHasSavedProfile(false);
-    setCallError(null);
-    setQuestionsRemaining(4);
-    setCallStep(0);
-    setAiMessage("");
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-      setUserStream(null);
-    }
+    setStep("entry");
   };
 
   const onboardingSteps = [
@@ -1844,14 +1422,8 @@ function AppContent() {
     setStep("video-call");
     
     setLives(prev => {
-      const next = Math.max(0, prev - 1);
+      const next = prev - 1;
       localStorage.setItem("explow_lives", next.toString());
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        updateDoc(userDocRef, {
-          lives: next
-        }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
-      }
       return next;
     });
     setQuestionsRemaining(4);
@@ -1868,7 +1440,7 @@ function AppContent() {
 
     setIsCallActive(true);
     setChatMessages([]);
-    setCallStep(-1);
+    setCallStep(0);
     
     // Ringing sound
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -1890,20 +1462,18 @@ function AppContent() {
     playRing();
 
     try {
-      if (profile.responseMode === "voice") {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("Media devices API not supported in this browser.");
-        }
-
-        console.log("Requesting media devices (camera and microphone)...");
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
-          audio: true 
-        });
-        console.log("Media devices access granted.");
-        streamRef.current = stream;
-        setUserStream(stream);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Media devices API not supported in this browser.");
       }
+
+      console.log("Requesting media devices (camera and microphone)...");
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+        audio: true 
+      });
+      console.log("Media devices access granted.");
+      streamRef.current = stream;
+      setUserStream(stream);
       
       // Start generating future video in background if not already present
       if (!futureSelf?.videoUrl) {
@@ -1939,9 +1509,6 @@ function AppContent() {
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
-          
-          CRITICAL VISUAL CONTEXT: ${futureSelf?.contextualObservation ? `You have just observed your past self and noticed: "${futureSelf.contextualObservation}". You MUST mention this observation warmly and naturally in your very first sentence of the conversation.` : "Observe your past self through the temporal link and acknowledge their presence."}
-          
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
           You are currently in a REAL-TIME VOICE CALL with your past self. 
           Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
@@ -1972,8 +1539,7 @@ function AppContent() {
             // Trigger initial greeting
             sessionPromise.then((session) => {
               liveSessionRef.current = session;
-              const greetingPrompt = `The connection is established. Greet your past self for the first time. ${futureSelf?.contextualObservation ? `Make sure to naturally mention your observation: "${futureSelf.contextualObservation}".` : ""} Start the conversation.`;
-              session.sendRealtimeInput({ text: greetingPrompt });
+              session.sendRealtimeInput({ text: "The connection is established. Greet your past self and start the conversation." });
               // Start sending audio from mic
               startAudioStreaming(session);
             });
@@ -2043,55 +1609,13 @@ function AppContent() {
       clearInterval(ringInterval);
       console.error("Call initialization failed:", err);
       
-      let errorMessage: React.ReactNode = "Call failed to start.";
-      const isPermissionError = 
-        err.name === "NotAllowedError" || 
-        err.name === "PermissionDeniedError" || 
-        err.message?.toLowerCase().includes("permission denied") ||
-        err.message?.toLowerCase().includes("denied by system");
-
-      if (isPermissionError) {
-        errorMessage = (
-          <div className="space-y-6">
-            <div className="flex justify-center">
-              <div className="p-4 rounded-full bg-red-500/10 border border-red-500/20">
-                <ShieldAlert className="w-12 h-12 text-red-500" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-serif italic text-white">Access Required</h3>
-              <p className="text-white/60 text-sm leading-relaxed">
-                Temporal synchronization requires camera and microphone access. Please enable them in your browser settings to proceed with the voice link.
-              </p>
-            </div>
-            <div className="pt-4 flex flex-col gap-3">
-              <button 
-                onClick={() => {
-                  setCallError(null);
-                  startCall();
-                }}
-                className="w-full py-3 bg-white text-black rounded-full text-xs font-bold uppercase tracking-widest hover:scale-[1.02] transition-all"
-              >
-                Try Again
-              </button>
-              <button 
-                onClick={() => {
-                  setProfile(prev => ({ ...prev, responseMode: "text" }));
-                  setCallError(null);
-                  // We don't call startCall immediately to give user a moment to see the change
-                  setTimeout(() => startCall(), 100);
-                }}
-                className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
-              >
-                Switch to Text Mode
-              </button>
-            </div>
-          </div>
-        );
+      let errorMessage = "Call failed to start.";
+      if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
+        errorMessage = "Camera or Microphone permission denied. Please enable them in your browser settings.";
       } else if (err.name === "NotFoundError") {
-        errorMessage = "No camera or microphone found. Please connect a device to use voice mode.";
+        errorMessage = "No camera or microphone found.";
       } else {
-        errorMessage = err.message || "An unexpected error occurred during temporal link initialization.";
+        errorMessage = err.message || "An unexpected error occurred.";
       }
       
       setCallError(errorMessage);
@@ -2290,21 +1814,8 @@ function AppContent() {
     }
   };
 
-  const deleteManifestation = async (id: string) => {
-    if (!user) return;
-    try {
-      await deleteDoc(doc(db, "manifestations", id));
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, `manifestations/${id}`);
-    }
-  };
-
   const generateFutureSelf = async (selfieData?: string) => {
     if (isGenerating) return;
-    if (lives <= 0) {
-      setCallError("You have reached your daily manifestation limit. Please return tomorrow.");
-      return;
-    }
 
     // Ensure API key is selected for advanced image generation
     if (window.aistudio?.hasSelectedApiKey) {
@@ -2318,19 +1829,6 @@ function AppContent() {
     setIsGenerating(true);
     setGenerationStage("Initializing temporal link...");
     try {
-      // Deduct life
-      setLives(prev => {
-        const next = Math.max(0, prev - 1);
-        localStorage.setItem("explow_lives", next.toString());
-        if (user) {
-          const userDocRef = doc(db, "users", user.uid);
-          updateDoc(userDocRef, {
-            lives: next
-          }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`));
-        }
-        return next;
-      });
-
       const ai = getAI();
       
       setGenerationStage("Synthesizing temporal narrative...");
@@ -2352,8 +1850,7 @@ function AppContent() {
         4. A "Future Recap" which includes a concise summary of their journey and 3 actionable steps they should take today to manifest this future.
         5. 3-4 interactive "hotspots" (x, y coordinates from 0-100, label, and a short description) that reveal specific skills or life achievements.
         6. A "Timeline" with 3 stages (+5, +10, +20 years), each with a short narrative and visual description.
-        7. The gender of the person in the selfie or based on the profile (male, female, or neutral).
-        8. A "Contextual Observation": A gentle, human-like acknowledgement of high-level visual cues from the user's current environment or appearance in the selfie (e.g., "I love that shade of blue you're wearing," or "The light in your room feels so peaceful today"). Use soft language and optional light humor. Do NOT identify people, store data, or make sensitive inferences. Keep it brief and warm.` }
+        7. The gender of the person in the selfie or based on the profile (male, female, or neutral).` }
       ];
 
       const currentSelfie = selfieData || profile.selfie;
@@ -2372,18 +1869,17 @@ function AppContent() {
         contents: { parts: textParts },
         config: {
           responseMimeType: "application/json",
-          maxOutputTokens: 2048,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              narrative: { type: Type.STRING, description: "A concise poetic narrative (1-2 paragraphs)." },
-              traits: { type: Type.ARRAY, items: { type: Type.STRING }, description: "4 key traits." },
-              visualDescription: { type: Type.STRING, description: "Detailed visual description for an image generator." },
+              narrative: { type: Type.STRING },
+              traits: { type: Type.ARRAY, items: { type: Type.STRING } },
+              visualDescription: { type: Type.STRING },
               recap: {
                 type: Type.OBJECT,
                 properties: {
-                  summary: { type: Type.STRING, description: "Concise summary of the journey." },
-                  actionSteps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 actionable steps." },
+                  summary: { type: Type.STRING },
+                  actionSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
                 },
                 required: ["summary", "actionSteps"],
               },
@@ -2406,16 +1902,15 @@ function AppContent() {
                   type: Type.OBJECT,
                   properties: {
                     years: { type: Type.NUMBER },
-                    narrative: { type: Type.STRING, description: "Short narrative for this stage." },
-                    visualDescription: { type: Type.STRING, description: "Visual description for this stage." },
+                    narrative: { type: Type.STRING },
+                    visualDescription: { type: Type.STRING },
                   },
                   required: ["years", "narrative", "visualDescription"],
                 },
               },
               gender: { type: Type.STRING, enum: ["male", "female", "neutral"] },
-              contextualObservation: { type: Type.STRING, description: "A brief, warm observation about the user's appearance or environment." },
             },
-            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender", "contextualObservation"],
+            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender"],
           },
         },
       });
@@ -2425,37 +1920,93 @@ function AppContent() {
       setFutureSelf(updatedFutureSelf);
       setProfile(prev => ({ ...prev, gender: data.gender }));
       
-      // Save to localStorage early
+      // Auto-transition to incoming call after a short delay
+      setTimeout(() => {
+        setGenerationStage("Establishing secure connection...");
+        setStep("incoming-call");
+        setIsGenerating(false);
+      }, 3000);
+
+      // Save to localStorage
       try {
         localStorage.setItem("explow_profile", JSON.stringify(profile));
         localStorage.setItem("explow_future_self", JSON.stringify(updatedFutureSelf));
       } catch (e) {
-        console.warn("Could not save all data to local storage.", e);
+        console.warn("Could not save all data to local storage (likely due to file size).", e);
       }
       setHasSavedProfile(true);
 
       // 2. Generate Image
       setGenerationStage("Visualizing future manifestation...");
       setIsGeneratingImage(true);
-      const generateImage = async (desc: string, selfie: string | undefined) => {
-        try {
-          const imageParts: any[] = [
-            { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${desc}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
-          ];
+      try {
+        const imageParts: any[] = [
+          { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
+        ];
 
-          if (selfie) {
-            const mimeType = selfie.split(";")[0].split(":")[1] || "image/jpeg";
-            imageParts.push({
+        if (currentSelfie) {
+          const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
+          imageParts.push({
+            inlineData: {
+              data: currentSelfie.split(",")[1],
+              mimeType: mimeType
+            }
+          });
+        }
+
+        const imageResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash-image",
+          contents: { parts: imageParts },
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1",
+            },
+          },
+        });
+
+        let imageFound = false;
+        for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
+          if (part.inlineData) {
+            const imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            setFutureSelf((prev) => {
+              const updated = prev ? { ...prev, imageUrl } : null;
+              if (updated) {
+                try {
+                  localStorage.setItem("explow_future_self", JSON.stringify(updated));
+                } catch (e) {
+                  console.warn("Could not save future self with image to local storage.", e);
+                }
+              }
+              return updated;
+            });
+            imageFound = true;
+            break;
+          }
+        }
+
+        if (!imageFound) {
+          throw new Error("No image data found in response");
+        }
+
+        // 3. Generate Images for other timeline stages
+        for (let i = 0; i < data.timelineStages.length; i++) {
+          const stage = data.timelineStages[i];
+          const stageImageParts: any[] = [
+            { text: `A high-fidelity, photorealistic digital avatar representing this future self at +${stage.years} years: ${stage.visualDescription}. Focus on advanced realistic facial features, age-appropriate skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
+          ];
+          if (currentSelfie) {
+            const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
+            stageImageParts.push({
               inlineData: {
-                data: selfie.split(",")[1],
+                data: currentSelfie.split(",")[1],
                 mimeType: mimeType
               }
             });
           }
 
-          const imageResponse = await ai.models.generateContent({
+          const stageImageResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash-image",
-            contents: { parts: imageParts },
+            contents: { parts: stageImageParts },
             config: {
               imageConfig: {
                 aspectRatio: "1:1",
@@ -2463,78 +2014,25 @@ function AppContent() {
             },
           });
 
-          for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
+          for (const part of stageImageResponse.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
-              return `data:image/png;base64,${part.inlineData.data}`;
+              const stageImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+              setFutureSelf((prev) => {
+                if (!prev || !prev.timelineStages) return prev;
+                const updatedStages = [...prev.timelineStages];
+                updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
+                const updated = { ...prev, timelineStages: updatedStages };
+                return updated;
+              });
+              break;
             }
-          }
-        } catch (err) {
-          console.error("Image generation error:", err);
-        }
-        return null;
-      };
-
-      try {
-        const mainImageUrl = await generateImage(data.visualDescription, currentSelfie);
-        if (mainImageUrl) {
-          setFutureSelf(prev => prev ? { ...prev, imageUrl: mainImageUrl } : null);
-        } else {
-          // Fallback image
-          const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.passion)}/800/800`;
-          setFutureSelf(prev => prev ? { ...prev, imageUrl: fallbackUrl } : null);
-        }
-
-        // Save to Firestore as soon as we have the main image (or if it fails)
-        if (user) {
-          try {
-            await addDoc(collection(db, "manifestations"), {
-              uid: user.uid,
-              name: profile.name,
-              passion: profile.passion,
-              futureChoice: profile.futureChoice,
-              responseMode: profile.responseMode,
-              imageUrl: mainImageUrl || "",
-              videoUrl: "",
-              narrative: data.narrative || "",
-              traits: data.traits || [],
-              contextualObservation: data.contextualObservation || "",
-              timestamp: new Date().toISOString()
-            });
-          } catch (err) {
-            console.error("Failed to save manifestation to Firestore:", err);
-          }
-        }
-
-        // Generate images for other timeline stages in background
-        for (let i = 0; i < data.timelineStages.length; i++) {
-          const stage = data.timelineStages[i];
-          const stageImageUrl = await generateImage(stage.visualDescription, currentSelfie);
-          if (stageImageUrl) {
-            setFutureSelf(prev => {
-              if (!prev || !prev.timelineStages) return prev;
-              const updatedStages = [...prev.timelineStages];
-              updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
-              return { ...prev, timelineStages: updatedStages };
-            });
           }
         }
       } catch (imageError) {
         console.error("Image generation failed:", imageError);
-        setGenerationStage("Image generation failed. You can upload an avatar manually.");
       } finally {
         setIsGeneratingImage(false);
       }
-
-      // Final transition
-      setGenerationStage("Establishing secure connection...");
-      setTimeout(() => {
-        if (profile.responseMode === "text") {
-          startCall();
-        } else {
-          setStep("incoming-call");
-        }
-        setIsGenerating(false);
-      }, 1500);
 
     } catch (error) {
       console.error("Future self generation failed:", error);
@@ -2547,132 +2045,169 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
-      <BackgroundVideo />
-      <Navbar 
-        onBegin={() => {
-          if (step === "entry") setStep("choose-future");
-        }} 
-        user={user}
-        onSignOut={() => signOut(auth)}
-      />
-      
-      {step !== "entry" && (
-        <>
-          <TemporalGrid />
-          <TemporalHUD />
-        </>
-      )}
-
-      {["choose-future", "choose-response", "take-selfie"].includes(step) && (
-        <ProgressIndicator 
-          current={
-            step === "entry" ? 0 : 
-            step === "choose-future" ? 1 : 
-            step === "choose-response" ? 2 : 3
-          } 
-          total={4} 
-        />
-      )}
+      <div className="atmosphere" />
+      <TemporalGrid />
+      <TemporalHUD />
 
       <AnimatePresence mode="wait">
         {step === "entry" && (
-          <div className="w-full">
-            <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-32 pb-40 py-[90px] min-h-screen w-full">
-              <h1 
-                className="text-5xl sm:text-7xl md:text-8xl leading-[0.95] tracking-[-2.46px] max-w-7xl font-normal animate-fade-rise"
-                style={{ fontFamily: "'Instrument Serif', serif" }}
-              >
-                Where <em className="not-italic text-muted-foreground">dreams</em> rise <em className="not-italic text-muted-foreground">through the silence.</em>
-              </h1>
-              <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mt-8 leading-relaxed animate-fade-rise-delay">
-                We're designing tools for deep thinkers, bold creators, and quiet rebels. Amid the chaos, we build digital spaces for sharp focus and inspired work.
-              </p>
-              
-              <div className="flex flex-col items-center gap-8 mt-12 animate-fade-rise-delay-2">
-                <button 
-                  onClick={() => setStep("choose-future")}
-                  className="liquid-glass rounded-full px-14 py-5 text-base text-foreground hover:scale-[1.03] cursor-pointer transition-transform"
+          <motion.div
+            key="entry"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="w-full max-w-2xl text-center space-y-16 relative z-10"
+          >
+            <div className="space-y-8">
+              {callError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm mb-8 backdrop-blur-xl"
                 >
-                  Begin Journey
-                </button>
+                  {callError}
+                </motion.div>
+              )}
+              
+              <div className="relative">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    opacity: [0.2, 0.4, 0.2]
+                  }}
+                  transition={{ duration: 6, repeat: Infinity }}
+                  className="w-48 h-48 bg-white/10 rounded-full mx-auto blur-3xl absolute left-1/2 -translate-x-1/2 -top-12"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="relative"
+                >
+                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9]">
+                    Your future self <br /> 
+                    <span className="text-white/40">is calling.</span>
+                  </h1>
+                </motion.div>
+              </div>
+              
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="max-w-sm mx-auto space-y-4 pt-8"
+              >
+                <div className="relative group">
+                  <input
+                    type="text"
+                    placeholder="Your Name"
+                    value={profile.name}
+                    onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
+                  />
+                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
+                </div>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    placeholder="Your Passion (e.g. Art, Tech, Nature)"
+                    value={profile.passion}
+                    onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
+                  />
+                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
+                </div>
+              </motion.div>
 
-                {!user && (
-                  <button 
-                    disabled={isSigningIn}
-                    onClick={async () => {
-                      setIsSigningIn(true);
-                      try {
-                        await signInWithPopup(auth, googleProvider);
-                        setIsSigningIn(false);
-                      } catch (error) {
-                        console.error(error);
-                        setIsSigningIn(false);
-                      }
-                    }}
-                    className="text-xs font-mono text-white/40 hover:text-white/80 transition-colors uppercase tracking-[0.3em]"
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                className="text-white/30 font-mono uppercase tracking-[0.6em] text-[9px] pt-4 flex flex-col items-center gap-2"
+              >
+                <div>Temporal Link Status: <span className="text-white/60">Ready</span></div>
+                <div className="flex items-center gap-2">
+                  <Heart className={cn("w-3 h-3", lives === 0 ? "text-red-500" : "text-white/40")} />
+                  <span>{lives} / 3 Daily Tokens Available</span>
+                </div>
+              </motion.div>
+            </div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="space-y-8"
+            >
+              <button
+                onClick={async () => {
+                  if (hasApiKey === false) {
+                    await openKeySelection();
+                  } else {
+                    setStep("choose-future");
+                  }
+                }}
+                className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+              >
+                <span className="relative z-10 flex items-center">
+                  {hasApiKey === false ? "Initialize Link" : "Accept Call"} 
+                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                </span>
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
+                />
+              </button>
+
+              <div className="flex flex-col items-center gap-4">
+                {hasApiKey === false && (
+                  <p className="text-white/30 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">
+                    A paid Gemini API key is required to synthesize temporal video data.
+                  </p>
+                )}
+
+                {hasSavedProfile && (
+                  <button
+                    onClick={() => setStep("takeaway")}
+                    className="text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
                   >
-                    {isSigningIn ? "Connecting..." : "Sign in to Sync Tokens"}
+                    View Previous Reflection
                   </button>
                 )}
               </div>
-            </div>
-
-            {/* Gallery Section */}
-            <div className="max-w-7xl mx-auto px-6 pb-32">
-              <ManifestationGallery 
-                items={manifestations} 
-                onDelete={deleteManifestation}
-                onSelect={(m) => {
-                  setFutureSelf({
-                    narrative: m.narrative || "",
-                    traits: m.traits || [],
-                    visualDescription: "",
-                    gender: "neutral",
-                    contextualObservation: m.contextualObservation || "",
-                    recap: { summary: "", actionSteps: [] },
-                    hotspots: [],
-                    timelineStages: [],
-                    imageUrl: m.imageUrl,
-                    videoUrl: m.videoUrl
-                  });
-                  setProfile(prev => ({
-                    ...prev,
-                    name: m.name,
-                    passion: m.passion,
-                    futureChoice: m.futureChoice,
-                    responseMode: m.responseMode
-                  }));
-                  setStep("incoming-call");
-                }}
-              />
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {step === "choose-future" && (
-          <OnboardingStep
+          <motion.div
             key="choose-future"
-            title="Destination"
-            subtitle="Temporal Coordinate Selection"
-            currentStep={1}
-            totalSteps={4}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            className="w-full max-w-4xl space-y-16 relative z-10"
           >
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Select Destination</h2>
+              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Coordinate Selection</p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {[
                 { id: "1-year", label: "1 Year", desc: "Immediate path.", icon: <Clock className="w-6 h-6" /> },
                 { id: "5-years", label: "5 Years", desc: "Mid-term evolution.", icon: <Zap className="w-6 h-6" /> },
-                { id: "goal-achieved", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
+                { id: "goal", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
               ].map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => {
                     setProfile(prev => ({ ...prev, futureChoice: opt.id as any }));
+                    setStep("choose-response");
                   }}
                   className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.futureChoice === opt.id 
-                      ? "bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "liquid-glass text-white hover:bg-white/[0.08]"
+                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
+                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
@@ -2682,12 +2217,13 @@ function AppContent() {
                     {opt.icon}
                   </div>
                   <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight" style={{ fontFamily: "'Instrument Serif', serif" }}>{opt.label}</p>
+                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
                     <p className={cn(
                       "text-xs md:text-sm leading-relaxed",
                       profile.futureChoice === opt.id ? "text-black/60" : "text-white/40"
                     )}>{opt.desc}</p>
                   </div>
+                  
                   <div className={cn(
                     "absolute bottom-0 left-0 h-1 bg-current transition-all duration-500",
                     profile.futureChoice === opt.id ? "w-full" : "w-0 group-hover:w-12"
@@ -2695,32 +2231,22 @@ function AppContent() {
                 </button>
               ))}
             </div>
-
-            <div className="flex justify-center gap-6 pt-8">
-              <button
-                onClick={() => setStep("entry")}
-                className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => setStep("choose-response")}
-                className="px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.3em] text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-              >
-                Continue
-              </button>
-            </div>
-          </OnboardingStep>
+          </motion.div>
         )}
 
         {step === "choose-response" && (
-          <OnboardingStep
+          <motion.div
             key="choose-response"
-            title="Interface"
-            subtitle="Communication Mode"
-            currentStep={2}
-            totalSteps={4}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            className="w-full max-w-2xl space-y-16 relative z-10"
           >
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Interface</h2>
+              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Communication Mode</p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {[
                 { id: "voice", label: "Voice", desc: "Real-time audio.", icon: <Mic className="w-6 h-6" /> },
@@ -2730,12 +2256,13 @@ function AppContent() {
                   key={opt.id}
                   onClick={() => {
                     setProfile(prev => ({ ...prev, responseMode: opt.id as any }));
+                    setStep("take-selfie");
                   }}
                   className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
+                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
                     profile.responseMode === opt.id 
-                      ? "bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "liquid-glass text-white hover:bg-white/[0.08]"
+                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
+                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
                   )}
                 >
                   <div className={cn(
@@ -2745,7 +2272,7 @@ function AppContent() {
                     {opt.icon}
                   </div>
                   <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight" style={{ fontFamily: "'Instrument Serif', serif" }}>{opt.label}</p>
+                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
                     <p className={cn(
                       "text-xs md:text-sm leading-relaxed",
                       profile.responseMode === opt.id ? "text-black/60" : "text-white/40"
@@ -2754,49 +2281,32 @@ function AppContent() {
                 </button>
               ))}
             </div>
-
-            <div className="flex justify-center gap-6 pt-8">
-              <button
-                onClick={() => setStep("choose-future")}
-                className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => {
-                  if (profile.responseMode === "text") {
-                    skipSelfie();
-                  } else {
-                    setStep("take-selfie");
-                  }
-                }}
-                className="px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.3em] text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-              >
-                Continue
-              </button>
-            </div>
             <p className="text-center text-white/30 text-[9px] font-mono uppercase tracking-[0.4em]">
               Note: You can toggle modes during active manifestation.
             </p>
-          </OnboardingStep>
+          </motion.div>
         )}
 
         {step === "take-selfie" && (
-          <OnboardingStep
+          <motion.div
             key="take-selfie"
-            title="Biometric Sync"
-            subtitle="Temporal Mirror Calibration"
-            currentStep={3}
-            totalSteps={4}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="w-full max-w-3xl space-y-12 relative z-10"
           >
-            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden liquid-glass group shadow-2xl">
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl md:text-6xl font-serif italic tracking-tight text-glow">Biometric Sync</h2>
+              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Mirror Calibration</p>
+            </div>
+
+            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
               {stream ? (
                 <>
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    muted
                     className="w-full h-full object-cover mirror"
                   />
                   {/* Scanner HUD Overlay */}
@@ -2845,23 +2355,6 @@ function AppContent() {
                   >
                     Enable Temporal Mirror
                   </button>
-                  <div className="flex flex-col items-center gap-2">
-                    <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest">Or</p>
-                    <button
-                      onClick={() => avatarUploadRef.current?.click()}
-                      className="flex items-center gap-2 text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
-                    >
-                      <Upload className="w-3 h-3" />
-                      Upload Selfie
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={avatarUploadRef} 
-                      onChange={handleAvatarUpload} 
-                      accept="image/*" 
-                      className="hidden" 
-                    />
-                  </div>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
@@ -2871,12 +2364,6 @@ function AppContent() {
               {stream ? (
                 <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
                   <button
-                    onClick={() => setStep("choose-response")}
-                    className="w-full md:w-auto px-8 py-6 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
-                  >
-                    Back
-                  </button>
-                  <button
                     onClick={startCountdown}
                     disabled={countdown !== null}
                     className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-lg font-bold shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50"
@@ -2885,27 +2372,19 @@ function AppContent() {
                   </button>
                   <button
                     onClick={skipSelfie}
-                    className="w-full md:w-auto px-12 py-6 liquid-glass rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
+                    className="w-full md:w-auto px-12 py-6 bg-white/5 border border-white/10 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
                   >
                     Skip
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-6 w-full">
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setStep("choose-response")}
-                      className="px-8 py-5 liquid-glass text-white/60 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:text-white transition-all"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={startCamera}
-                      className="px-12 py-5 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
-                    >
-                      Enable Camera
-                    </button>
-                  </div>
+                  <button
+                    onClick={startCamera}
+                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
+                  >
+                    Enable Camera
+                  </button>
                   <button
                     onClick={skipSelfie}
                     className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[9px] border-b border-white/5 pb-1"
@@ -2915,7 +2394,7 @@ function AppContent() {
                 </div>
               )}
             </div>
-          </OnboardingStep>
+          </motion.div>
         )}
 
         {step === "transformation" && (
@@ -3011,26 +2490,6 @@ function AppContent() {
                     animate={{ x: ["-100%", "200%"] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                     className="absolute inset-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  />
-                </div>
-                
-                <div className="flex flex-col items-center gap-4 pt-4">
-                  <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
-                    AI generation can take up to 30 seconds. If it hangs, you can manually upload your avatar.
-                  </p>
-                  <button
-                    onClick={() => avatarUploadRef.current?.click()}
-                    className="flex items-center gap-2 text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Upload Avatar Manually
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={avatarUploadRef} 
-                    onChange={handleManualAvatarUpload} 
-                    accept="image/*" 
-                    className="hidden" 
                   />
                 </div>
               </div>
@@ -3133,387 +2592,259 @@ function AppContent() {
             <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] z-10" />
             <div className="scan-line opacity-20" />
             
-            {profile.responseMode === "text" ? (
-              <div className="w-full h-full flex flex-col max-w-4xl mx-auto p-4 md:p-8 relative z-20">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border border-white/20">
-                      {futureSelf?.imageUrl ? (
-                        <img src={futureSelf.imageUrl} alt="Future Self" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-white/5 flex items-center justify-center"><User className="w-6 h-6 text-white/20" /></div>
-                      )}
+            <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
+              {/* User Side */}
+              <motion.div 
+                initial={{ x: -100, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
+              >
+                <UserVideo stream={userStream} isCameraOn={isCameraOn} />
+                
+                {/* HUD Elements for User */}
+                <div className="absolute top-8 left-8 z-20 space-y-4">
+                  <StatusBadge label="Identity" value="Past Self" icon={User} />
+                  <StatusBadge label="Location" value="Present Day" icon={Clock} />
+                  <StatusBadge 
+                    label="Temporal Energy" 
+                    value={`${lives} Tokens Left`} 
+                    icon={Heart} 
+                    color={lives === 1 ? "text-red-400" : "text-white/60"}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Future Self Side */}
+              <motion.div 
+                initial={{ x: 100, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="relative flex-1 h-1/2 md:h-full overflow-hidden bg-black flex items-center justify-center z-0"
+              >
+                {futureSelf?.videoUrl ? (
+                  <FutureVideo 
+                    videoUrl={futureSelf.videoUrl} 
+                    isSpeaking={isSpeaking} 
+                    outputVolume={outputVolume} 
+                  />
+                ) : futureSelf?.imageUrl ? (
+                  <motion.img
+                    src={futureSelf.imageUrl}
+                    alt="Future Self"
+                    className="w-full h-full object-cover"
+                    animate={{
+                      scale: isSpeaking ? [1, 1.03, 1] : [1, 1.01, 1],
+                      filter: isSpeaking ? "brightness(1.1) saturate(1.1)" : "brightness(1) saturate(1)",
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="relative">
+                      <div className="w-16 h-16 border-2 border-white/10 border-t-white animate-spin rounded-full" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <RefreshCw className="w-6 h-6 text-white/40" />
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-xl font-serif italic" style={{ fontFamily: "'Instrument Serif', serif" }}>
-                        {profile.name} <span className="text-white/40">Manifestation</span>
-                      </h3>
-                      <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Neural Link Active</p>
-                    </div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/40 animate-pulse">Manifesting Identity...</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <StatusBadge label="Sync" value={`${questionsRemaining} Left`} icon={MessageSquare} />
-                    <button 
-                      onClick={() => setStep("entry")} 
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/60 transition-all"
-                    >
-                      Home
-                    </button>
-                    <button 
-                      onClick={() => {
-                        const chatText = chatMessages.map(m => `${m.role === 'user' ? 'Past Self' : 'Future Self'}: ${m.text}`).join('\n\n');
-                        navigator.clipboard.writeText(chatText);
-                      }} 
-                      className="p-3 bg-white/5 text-white/60 rounded-full hover:bg-white/10 transition-all"
-                      title="Copy Chat History"
-                    >
-                      <Copy className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={() => setIsShareModalOpen(true)} 
-                      className="p-3 bg-white/5 text-white/60 rounded-full hover:bg-white/10 transition-all"
-                      title="Share Manifestation"
-                    >
-                      <Share2 className="w-5 h-5" />
-                    </button>
-                    <button onClick={endCall} className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500/20 transition-all">
-                      <PhoneOff className="w-5 h-5" />
-                    </button>
-                  </div>
+                )}
+
+                {/* HUD Elements for Future Self */}
+                <div className="absolute top-8 right-8 z-20 space-y-4 flex flex-col items-end">
+                  <StatusBadge 
+                    label="Identity" 
+                    value="Future Manifestation" 
+                    icon={Zap} 
+                    color={isSpeaking ? "text-green-400" : "text-white/60"}
+                  />
+                  <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
+                  <StatusBadge 
+                    label="Sync Limit" 
+                    value={`${questionsRemaining} Questions`} 
+                    icon={MessageSquare} 
+                    color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
+                  />
                 </div>
 
-                {/* Chat Area */}
-                <div className="flex-1 overflow-y-auto mb-8 space-y-6 pr-4 custom-scrollbar">
-                  {chatMessages.map((msg, i) => (
-                    <motion.div
-                      key={i}
+                {isGeneratingVideo && (
+                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 w-full max-w-xs px-8">
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-3 h-3 text-white animate-spin" />
+                        <span className="text-[9px] font-mono uppercase tracking-widest text-white/70">Updating Manifestation</span>
+                      </div>
+                      <span className="text-[9px] font-mono text-white/80">{Math.round(videoProgressPercent)}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                      <motion.div 
+                        className="h-full bg-white shadow-[0_0_10px_white]"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${videoProgressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {!futureSelf?.videoUrl && !isGeneratingVideo && (
+                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
+                    <button
+                      onClick={() => generateFutureVideo()}
+                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                    >
+                      <Video className="w-4 h-4 text-white/60 group-hover:text-white" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Manifest Video</span>
+                    </button>
+                  </div>
+                )}
+
+                {futureSelf?.videoUrl && !isGeneratingVideo && (
+                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 flex gap-4">
+                    <button
+                      onClick={() => generateFutureVideo('sing')}
+                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                    >
+                      <Music className="w-4 h-4 text-white/60 group-hover:text-white" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Sing</span>
+                    </button>
+                    <button
+                      onClick={() => generateFutureVideo('dance')}
+                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                    >
+                      <Zap className="w-4 h-4 text-white/60 group-hover:text-white" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Dance</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Subtle Vignette */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+              </motion.div>
+            </div>
+
+            {/* Central Content: The Orb & Transcription */}
+            <div className="relative z-20 flex flex-col items-center justify-center space-y-12 w-full h-full pointer-events-none">
+              <div className="text-center space-y-3 pointer-events-auto">
+                {callError ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-8 glass-card max-w-md border-red-500/30"
+                  >
+                    <p className="text-red-400 font-medium mb-6">{callError}</p>
+                    <button 
+                      onClick={endCall}
+                      className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
+                    >
+                      Close Connection
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center justify-center gap-3 mb-4 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
+                      <motion.div 
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]"
+                      />
+                      <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/80 font-bold">Temporal Stream Active</span>
+                    </div>
+                    <motion.h2 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        "flex flex-col max-w-[80%]",
-                        msg.role === "user" ? "ml-auto items-end" : "items-start"
-                      )}
+                      className="text-2xl font-serif italic tracking-tight text-white/90"
                     >
-                      <div className={cn(
-                        "px-6 py-4 rounded-2xl text-lg leading-relaxed relative group/msg",
-                        msg.role === "user" 
-                          ? "bg-white text-black rounded-tr-none" 
-                          : "liquid-glass rounded-tl-none text-white/90"
-                      )}>
-                        {msg.text}
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(msg.text);
-                            // Maybe add a toast here
-                          }}
-                          className="absolute -right-12 top-1/2 -translate-y-1/2 p-2 bg-white/5 rounded-full opacity-0 group-hover/msg:opacity-100 transition-opacity hover:bg-white/10"
-                          title="Copy message"
-                        >
-                          <Copy className="w-3 h-3 text-white/40" />
-                        </button>
-                      </div>
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-white/20 mt-2">
-                        {msg.role === "user" ? "Past Self" : "Future Self"}
-                      </span>
-                    </motion.div>
-                  ))}
-                  {isAITyping && (
-                    <div className="flex items-center gap-3 text-white/40">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span className="text-xs font-mono uppercase tracking-widest">Synthesizing...</span>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
+                      {profile.name} <span className="text-white/40">Manifestation</span>
+                    </motion.h2>
+                  </div>
+                )}
+              </div>
 
-                {/* Input Area */}
-                <div className="relative">
+              {!callError && profile.responseMode === "voice" && (
+                <div className="pointer-events-auto">
+                  <VoiceOrb 
+                    isSpeaking={isSpeaking} 
+                    isListening={isListening} 
+                    isThinking={isChatLoading} 
+                    volume={outputVolume}
+                  />
+                </div>
+              )}
+
+              {/* Transcription Area */}
+              <div className="absolute bottom-48 left-0 right-0 px-12 flex flex-col items-center pointer-events-none z-20">
+                <AnimatePresence mode="wait">
+                  {chatMessages.length > 0 && (
+                    <motion.div
+                      key={chatMessages.length}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="max-w-3xl text-center"
+                    >
+                      <p className={cn(
+                        "text-xl md:text-3xl font-serif italic leading-relaxed drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]",
+                        chatMessages[chatMessages.length - 1].role === "model" ? "text-white text-glow" : "text-white/50"
+                      )}>
+                        {chatMessages[chatMessages.length - 1].text}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Call Controls Bar */}
+            <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
+              <div className="flex items-center gap-6 bg-black/60 backdrop-blur-2xl border border-white/10 p-3 rounded-full shadow-2xl">
+                <button
+                  onClick={toggleMute}
+                  className={cn(
+                    "p-4 rounded-full transition-all hover:bg-white/5",
+                    isMuted ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
+                  )}
+                >
+                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                </button>
+                
+                <button
+                  onClick={toggleCamera}
+                  className={cn(
+                    "p-4 rounded-full transition-all hover:bg-white/5",
+                    !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
+                  )}
+                >
+                  {!isCameraOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                </button>
+
+                <button
+                  onClick={endCall}
+                  className="p-6 bg-white text-black rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
+                >
+                  <PhoneOff className="w-8 h-8" fill="currentColor" />
+                </button>
+              </div>
+
+              {profile.responseMode === "text" && (
+                <div className="flex-1 max-w-lg flex gap-3">
                   <input
                     type="text"
                     value={userResponse}
                     onChange={(e) => setUserResponse(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
                     placeholder="Message your future self..."
-                    className="w-full liquid-glass rounded-full py-6 px-10 focus:outline-none focus:bg-white/5 transition-all text-lg"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-5 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all text-base backdrop-blur-xl"
                   />
                   <button
                     onClick={() => handleNextCallStep(userResponse)}
                     disabled={!userResponse || isAITyping}
-                    className="absolute right-3 top-3 p-4 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-30"
+                    className="p-5 bg-white text-black rounded-2xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all shadow-xl"
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-6 h-6" />
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
-                {/* User Side */}
-                <motion.div 
-                  initial={{ x: -100, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
-                >
-                  <UserVideo stream={userStream} isCameraOn={isCameraOn} selfie={profile.selfie} />
-                  
-                  {/* HUD Elements for User */}
-                  <div className="absolute top-8 left-8 z-20 space-y-4">
-                    <StatusBadge label="Identity" value="Past Self" icon={User} />
-                    <StatusBadge label="Location" value="Present Day" icon={Clock} />
-                    <div className="space-y-1">
-                      <StatusBadge 
-                        label="Temporal Energy" 
-                        value={`${lives} Tokens Left`} 
-                        icon={Heart} 
-                        color={lives <= 1 ? "text-red-400" : "text-white/60"}
-                      />
-                      {lives < 3 && (
-                        <p className="pl-5 text-[8px] font-mono uppercase tracking-widest text-white/20">
-                          Refill: {nextRefillTime}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Future Self Side */}
-                <motion.div 
-                  initial={{ x: 100, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="relative flex-1 h-1/2 md:h-full overflow-hidden bg-black flex items-center justify-center z-0"
-                >
-                  {futureSelf?.videoUrl ? (
-                    <FutureVideo 
-                      videoUrl={futureSelf.videoUrl} 
-                      isSpeaking={isSpeaking} 
-                      outputVolume={outputVolume} 
-                    />
-                  ) : futureSelf?.imageUrl ? (
-                    <motion.img
-                      src={futureSelf.imageUrl}
-                      alt="Future Self"
-                      className="w-full h-full object-cover"
-                      animate={{
-                        scale: isSpeaking ? [1, 1.03, 1] : [1, 1.01, 1],
-                        filter: isSpeaking ? "brightness(1.1) saturate(1.1)" : "brightness(1) saturate(1)",
-                      }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-6">
-                      <div className="relative">
-                        <div className="w-16 h-16 border-2 border-white/10 border-t-white animate-spin rounded-full" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <RefreshCw className="w-6 h-6 text-white/40" />
-                        </div>
-                      </div>
-                      <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/40 animate-pulse">Manifesting Identity...</p>
-                    </div>
-                  )}
-
-                  {/* HUD Elements for Future Self */}
-                  <div className="absolute top-8 right-8 z-20 space-y-4 flex flex-col items-end">
-                    <StatusBadge 
-                      label="Identity" 
-                      value="Future Manifestation" 
-                      icon={Sparkles} 
-                      color={isSpeaking ? "text-green-400" : "text-white/60"}
-                    />
-                    <StatusBadge 
-                      label="Temporal Offset" 
-                      value={profile.futureChoice === '1-year' ? '+1 Year' : profile.futureChoice === '5-years' ? '+5 Years' : 'Goal Achieved'} 
-                      icon={Clock} 
-                    />
-                    <StatusBadge 
-                      label="Sync Limit" 
-                      value={`${questionsRemaining} Questions`} 
-                      icon={MessageSquare} 
-                      color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
-                    />
-
-                    {futureSelf?.contextualObservation && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 2 }}
-                        className="mt-8 max-w-[200px] bg-white/5 backdrop-blur-xl border border-white/10 p-4 rounded-2xl text-left"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-[8px] font-mono uppercase tracking-widest text-white/40">Neural Observation</span>
-                        </div>
-                        <p className="text-[10px] text-white/80 leading-relaxed italic">
-                          "{futureSelf.contextualObservation}"
-                        </p>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {isGeneratingVideo && (
-                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 w-full max-w-xs px-8">
-                      <div className="flex items-center justify-between w-full mb-1">
-                        <div className="flex items-center gap-2">
-                          <RefreshCw className="w-3 h-3 text-white animate-spin" />
-                          <span className="text-[9px] font-mono uppercase tracking-widest text-white/70">Updating Manifestation</span>
-                        </div>
-                        <span className="text-[9px] font-mono text-white/80">{Math.round(videoProgressPercent)}%</span>
-                      </div>
-                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
-                        <motion.div 
-                          className="h-full bg-white shadow-[0_0_10px_white]"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${videoProgressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {!futureSelf?.videoUrl && !isGeneratingVideo && (
-                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
-                      <button
-                        onClick={() => generateFutureVideo()}
-                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                      >
-                        <Video className="w-4 h-4 text-white/60 group-hover:text-white" />
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Manifest Video</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {futureSelf?.videoUrl && !isGeneratingVideo && (
-                    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 flex gap-4">
-                      <button
-                        onClick={() => generateFutureVideo('sing')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                      >
-                        <Music className="w-4 h-4 text-white/60 group-hover:text-white" />
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Sing</span>
-                      </button>
-                      <button
-                        onClick={() => generateFutureVideo('dance')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                      >
-                        <Zap className="w-4 h-4 text-white/60 group-hover:text-white" />
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Dance</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Subtle Vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
-                </motion.div>
-              </div>
-            )}
-
-            {/* Central Content: The Orb & Transcription (Only for Voice Mode) */}
-            {profile.responseMode === "voice" && (
-              <div className="relative z-20 flex flex-col items-center justify-center space-y-12 w-full h-full pointer-events-none">
-                <div className="text-center space-y-3 pointer-events-auto">
-                  {callError ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="p-8 glass-card max-w-md border-red-500/30"
-                    >
-                      <div className="text-red-400 font-medium mb-6">{callError}</div>
-                      <button 
-                        onClick={endCall}
-                        className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
-                      >
-                        Close Connection
-                      </button>
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col items-center">
-                      <div className="flex items-center justify-center gap-3 mb-4 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
-                        <motion.div 
-                          animate={{ opacity: [0.4, 1, 0.4] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                        />
-                        <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/80 font-bold">Temporal Stream Active</span>
-                      </div>
-                      <motion.h2 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-2xl font-serif italic tracking-tight text-white/90"
-                        style={{ fontFamily: "'Instrument Serif', serif" }}
-                      >
-                        {profile.name} <span className="text-white/40">Manifestation</span>
-                      </motion.h2>
-                    </div>
-                  )}
-                </div>
-
-                {!callError && (
-                  <div className="pointer-events-auto">
-                    <VoiceOrb 
-                      isSpeaking={isSpeaking} 
-                      isListening={isListening} 
-                      isThinking={isChatLoading} 
-                      volume={outputVolume}
-                    />
-                  </div>
-                )}
-
-                {/* Transcription Area */}
-                <div className="absolute bottom-48 left-0 right-0 px-12 flex flex-col items-center pointer-events-none z-20">
-                  <AnimatePresence mode="wait">
-                    {chatMessages.length > 0 && (
-                      <motion.div
-                        key={chatMessages.length}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="max-w-3xl text-center"
-                      >
-                        <p className={cn(
-                          "text-xl md:text-3xl font-serif italic leading-relaxed drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]",
-                          chatMessages[chatMessages.length - 1].role === "model" ? "text-white text-glow" : "text-white/50"
-                        )}>
-                          {chatMessages[chatMessages.length - 1].text}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            )}
-
-            {/* Call Controls Bar (Only for Voice Mode) */}
-            {profile.responseMode === "voice" && (
-              <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
-                <div className="flex items-center gap-6 liquid-glass p-3 rounded-full shadow-2xl">
-                  <button
-                    onClick={toggleMute}
-                    className={cn(
-                      "p-4 rounded-full transition-all hover:bg-white/5",
-                      isMuted ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                    )}
-                  >
-                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                  </button>
-                  
-                  <button
-                    onClick={toggleCamera}
-                    className={cn(
-                      "p-4 rounded-full transition-all hover:bg-white/5",
-                      !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                    )}
-                  >
-                    {!isCameraOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                  </button>
-
-                  <button
-                    onClick={endCall}
-                    className="p-6 bg-white text-black rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
-                  >
-                    <PhoneOff className="w-8 h-8" fill="currentColor" />
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </motion.div>
         )}
 
@@ -3583,18 +2914,6 @@ function AppContent() {
                   <p className="text-4xl md:text-5xl text-white leading-[1.1] font-serif italic tracking-tight">
                     "{futureSelf.narrative}"
                   </p>
-                  
-                  {futureSelf.contextualObservation && (
-                    <div className="pt-8 border-t border-white/5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[9px] font-mono uppercase tracking-[0.4em] text-white/40">Temporal Sync Observation</span>
-                      </div>
-                      <p className="text-lg text-white/60 font-light italic leading-relaxed">
-                        "{futureSelf.contextualObservation}"
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -3651,20 +2970,6 @@ function AppContent() {
                 >
                   <Download className="w-4 h-4" /> Export Path
                 </button>
-
-                <button 
-                  onClick={() => avatarUploadRef.current?.click()} 
-                  className="flex items-center gap-3 text-[10px] uppercase tracking-[0.4em] text-white/40 hover:text-white transition-colors font-mono"
-                >
-                  <Camera className="w-4 h-4" /> Update Avatar
-                </button>
-                <input 
-                  type="file" 
-                  ref={avatarUploadRef} 
-                  onChange={handleManualAvatarUpload} 
-                  className="hidden" 
-                  accept="image/*" 
-                />
               </div>
             </div>
 
@@ -3804,21 +3109,12 @@ function AppContent() {
                     <div className="flex items-center gap-2">
                       <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Connection</p>
                       <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <button 
-                        onClick={() => {
-                          const chatText = chatMessages.map(m => `${m.role === 'user' ? 'Past Self' : 'Future Self'}: ${m.text}`).join('\n\n');
-                          const shareText = `[Future Self Conversation]\n\n${chatText}\n\nManifest your own future at ${window.location.origin}`;
-                          if (navigator.share) {
-                            navigator.share({ title: 'Future Self Conversation', text: shareText });
-                          } else {
-                            navigator.clipboard.writeText(shareText);
-                            alert("Conversation copied to clipboard!");
-                          }
-                        }}
-                        className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white transition-colors"
-                      >
-                        <Share2 className="w-3 h-3" /> Share Chat
-                      </button>
+                      <p className={cn(
+                        "text-[10px] font-mono uppercase tracking-widest transition-colors",
+                        questionsRemaining <= 1 ? "text-orange-400" : "text-white/40"
+                      )}>
+                        {questionsRemaining} Syncs Left
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3863,26 +3159,12 @@ function AppContent() {
                     )}
                   >
                     <div className={cn(
-                      "group relative px-4 py-3 rounded-2xl text-sm leading-relaxed",
+                      "px-4 py-3 rounded-2xl text-sm leading-relaxed",
                       msg.role === "user" 
                         ? "bg-white text-black rounded-tr-none" 
                         : "bg-white/10 border border-white/10 rounded-tl-none"
                     )}>
                       {msg.text}
-                      <button 
-                        onClick={() => {
-                          const shareText = `[Future Self Manifestation]\n${msg.role === 'user' ? 'Past Self' : 'Future Self'}: ${msg.text}\n\nManifest your own future at ${window.location.origin}`;
-                          if (navigator.share) {
-                            navigator.share({ title: 'Future Self Chat', text: shareText });
-                          } else {
-                            navigator.clipboard.writeText(shareText);
-                            alert("Message copied to clipboard!");
-                          }
-                        }}
-                        className="absolute -right-8 top-1/2 -translate-y-1/2 p-1.5 bg-white/5 hover:bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Share2 className="w-3 h-3 text-white/40" />
-                      </button>
                     </div>
                     {msg.role === "model" && (
                       <button 
@@ -3972,5 +3254,3 @@ function AppContent() {
     </div>
   );
 }
-
-export default App;
