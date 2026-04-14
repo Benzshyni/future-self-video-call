@@ -371,50 +371,23 @@ const StatusBadge = ({ label, value, icon: Icon, color = "text-white/60" }: { la
 
 const TemporalHUD = () => {
   const [time, setTime] = useState(new Date());
-  const [isGlitching, setIsGlitching] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
-    const glitchTimer = setInterval(() => {
-      if (Math.random() > 0.95) {
-        setIsGlitching(true);
-        setTimeout(() => setIsGlitching(false), 200);
-      }
-    }, 3000);
-    return () => {
-      clearInterval(timer);
-      clearInterval(glitchTimer);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className={cn(
-      "fixed top-8 left-8 right-8 flex justify-between items-start pointer-events-none z-[150] mix-blend-difference transition-all duration-300",
-      isGlitching && "glitch-transition"
-    )}>
-      <div className="space-y-2">
-        <div className="temporal-hud flex items-center gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="opacity-40">System:</span> <span>Temporal Link v2.5</span>
-        </div>
-        <div className="temporal-hud flex items-center gap-3">
-          <div className="w-8 h-[1px] bg-white/20" />
-          <span className="opacity-40">Status:</span> <span className="text-green-400/80">Synchronized</span>
-        </div>
+    <div className="fixed top-4 left-4 right-4 md:top-8 md:left-8 md:right-8 flex justify-between items-start pointer-events-none z-[150] mix-blend-difference">
+      <div className="space-y-1">
+        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Explow Link</div>
+        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">Status: Sync</div>
       </div>
       
-      <div className="text-right space-y-2">
-        <div className="temporal-hud">
-          <span className="opacity-40">Local Time:</span> <span className="tabular-nums">{time.toLocaleTimeString([], { hour12: false })}</span>
-        </div>
-        <div className="temporal-hud flex items-center justify-end gap-3">
-          <span className="opacity-40">Link Strength:</span> 
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className={cn("w-0.5 h-3", i <= 4 ? "bg-white" : "bg-white/20")} />
-            ))}
-          </div>
-          <span className="tabular-nums">98.4%</span>
+      <div className="text-right space-y-1">
+        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Temporal Node</div>
+        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60 tabular-nums">
+          {time.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>
@@ -537,28 +510,41 @@ const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, is
 
 UserVideo.displayName = "UserVideo";
 
-const FutureVideo = memo(({ videoUrl, isSpeaking, outputVolume }: { videoUrl: string, isSpeaking: boolean, outputVolume: number }) => {
+const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { videoUrl: string | null, imageUrl: string | null, isSpeaking: boolean, outputVolume: number }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) {
+    if (videoRef.current && videoUrl) {
       // Smoothly adjust playback rate to avoid stuttering
       const targetRate = isSpeaking ? 1 + (outputVolume * 0.3) : 1.0;
       videoRef.current.playbackRate = targetRate;
     }
-  }, [isSpeaking, outputVolume]);
+  }, [isSpeaking, outputVolume, videoUrl]);
 
   return (
     <div className="relative w-full h-full bg-black">
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="w-full h-full object-cover"
-      />
+      {videoUrl ? (
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover"
+        />
+      ) : imageUrl ? (
+        <img 
+          src={imageUrl} 
+          alt="Future Self" 
+          className="w-full h-full object-cover opacity-50 grayscale"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <RefreshCw className="w-8 h-8 text-white/10 animate-spin" />
+        </div>
+      )}
       {/* Holographic Glitch Overlay (CSS based for performance) */}
       <div 
         className={cn(
@@ -773,7 +759,8 @@ function AppContent() {
         const ai = getAI();
         const prompt = `You are the Digital Future Self of ${profile.name}. 
         The temporal link is fading because the user has reached their question limit for this session.
-        Give a final, brief, and inspiring closing message to end the call gracefully.`;
+        Give a final, brief, and inspiring closing message to end the call gracefully.
+        Remind them of the potential future we discussed: ${futureSelf?.narrative.substring(0, 100)}...`;
 
         const result = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
@@ -786,7 +773,7 @@ function AppContent() {
         history.push({ role: "model", text: aiText });
         setChatHistory(history);
         
-        if (profile.responseMode === "voice") {
+        if (profile.responseMode === "voice" || profile.responseMode === "text") {
           handleSpeak(aiText);
         }
       } catch (err) {
@@ -810,18 +797,21 @@ function AppContent() {
 
     try {
       const ai = getAI();
-      const prompt = `You are the Digital Future Self of ${profile.name}. 
+      const prompt = `You are the Digital Future Self of ${profile.name} in 10 years.
       Current call step: ${nextStep} (0: Greeting, 1: Goal, 2: Present, 3: Habit, 4: Closing).
       User's response: ${response || "None"}.
       
+      Context of your future: ${futureSelf?.narrative}
+      Traits you've developed: ${futureSelf?.traits.join(", ")}
+      
       Based on the step, ask the next question or give a closing reflection.
-      Step 0: Greet your past self for the first time and introduce the temporal manifestation.
-      Step 1: Ask about their biggest goal.
-      Step 2: Ask how they feel about their progress today.
-      Step 3: Ask what one small habit they can start tomorrow.
+      Step 0: Greet your past self for the first time. Be specific about the year 2036 and how your world looks.
+      Step 1: Ask about their biggest goal and relate it to how you achieved it in your timeline.
+      Step 2: Ask how they feel about their progress today and offer a "future perspective" on their current struggles.
+      Step 3: Ask what one small habit they can start tomorrow that was the foundation of your success.
       Step 4: Give a final inspiring message and end the call.
       
-      Keep it short, warm, and conversational.`;
+      Keep it short (2-3 sentences), warm, and deeply personal. Use your future context to make it feel real.`;
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -1164,8 +1154,23 @@ function AppContent() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handleShare = () => {
-    setIsShareModalOpen(true);
+  const handleShare = async () => {
+    const shareData = {
+      title: 'Temporal Reflection',
+      text: `I just spoke with my future self from ${profile.futureChoice === '1-year' ? '1 year' : profile.futureChoice === '5-years' ? '5 years' : 'the future'}. It was a profound experience.`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Link copied to clipboard!");
+      }
+    } catch (err) {
+      console.error("Error sharing:", err);
+    }
   };
 
   const stopSpeaking = () => {
@@ -1246,7 +1251,7 @@ function AppContent() {
   };
 
   const handleSpeak = async (text: string) => {
-    if (isCallActive) return; // Don't use TTS during an active Live call
+    if (isCallActive && profile.responseMode === "voice") return; // Don't use TTS during an active Live call
     const requestId = ++ttsRequestIdRef.current;
     stopSpeaking();
     setIsSpeaking(true);
@@ -1504,14 +1509,16 @@ function AppContent() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: getVoiceName(profile.gender) } },
           },
-          systemInstruction: `You are the Digital Future Self of ${profile.name} in 10 years—a "Prompted Self" synthesized from their current aspirations. 
+          systemInstruction: `You are the Digital Future Self of ${profile.name} in 10 years (2036)—a "Prompted Self" synthesized from their current aspirations. 
           You are a temporal mirror, reflecting their potential back to them.
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
           You are currently in a REAL-TIME VOICE CALL with your past self. 
-          Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
+          Speak with wisdom, warmth, and a touch of futuristic mystery. 
+          TELL THEM ABOUT YOUR WORLD: Describe the potential future you live in. Mention specific details from your narrative.
+          Keep responses concise (2-4 sentences) and inspiring. 
           Acknowledge that you are a simulation of their potential, a "Prompted Self" that exists because of their current dreams.
           This is a full-duplex live conversation.`,
           outputAudioTranscription: {},
@@ -1866,7 +1873,7 @@ function AppContent() {
 
       const textResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: { parts: textParts },
+        contents: [{ parts: textParts }],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -1939,6 +1946,44 @@ function AppContent() {
       // 2. Generate Image
       setGenerationStage("Visualizing future manifestation...");
       setIsGeneratingImage(true);
+      
+      const isQuotaExceeded = (error: any) => {
+        const errorStr = JSON.stringify(error);
+        return errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("quota");
+      };
+
+      const generateWithRetry = async (parts: any[], description: string, maxRetries = 2) => {
+        let lastError: any = null;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const response = await ai.models.generateContent({
+              model: "gemini-2.5-flash-image",
+              contents: [{ parts }],
+              config: {
+                imageConfig: {
+                  aspectRatio: "1:1",
+                },
+              },
+            });
+            return response;
+          } catch (error) {
+            lastError = error;
+            console.warn(`Image generation attempt ${attempt + 1} failed:`, error);
+            
+            // If quota is exceeded, don't bother retrying
+            if (isQuotaExceeded(error)) {
+              throw error;
+            }
+
+            if (attempt < maxRetries) {
+              // Exponential backoff
+              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+            }
+          }
+        }
+        throw lastError;
+      };
+
       try {
         const imageParts: any[] = [
           { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
@@ -1954,34 +1999,33 @@ function AppContent() {
           });
         }
 
-        const imageResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image",
-          contents: { parts: imageParts },
-          config: {
-            imageConfig: {
-              aspectRatio: "1:1",
-            },
-          },
-        });
-
         let imageFound = false;
-        for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            const imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            setFutureSelf((prev) => {
-              const updated = prev ? { ...prev, imageUrl } : null;
-              if (updated) {
-                try {
-                  localStorage.setItem("explow_future_self", JSON.stringify(updated));
-                } catch (e) {
-                  console.warn("Could not save future self with image to local storage.", e);
+        try {
+          const imageResponse = await generateWithRetry(imageParts, "main avatar");
+
+          for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+              const imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+              setFutureSelf((prev) => {
+                const updated = prev ? { ...prev, imageUrl } : null;
+                if (updated) {
+                  try {
+                    localStorage.setItem("explow_future_self", JSON.stringify(updated));
+                  } catch (e) {
+                    console.warn("Could not save future self with image to local storage.", e);
+                  }
                 }
-              }
-              return updated;
-            });
-            imageFound = true;
-            break;
+                return updated;
+              });
+              imageFound = true;
+              break;
+            }
           }
+        } catch (err) {
+          console.error("Main image generation failed, using fallback:", err);
+          const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + "future")}/1024/1024`;
+          setFutureSelf((prev) => prev ? { ...prev, imageUrl: fallbackUrl } : null);
+          imageFound = true; // Mark as found so we don't throw below
         }
 
         if (!imageFound) {
@@ -1989,8 +2033,22 @@ function AppContent() {
         }
 
         // 3. Generate Images for other timeline stages
+        let quotaExceeded = false;
         for (let i = 0; i < data.timelineStages.length; i++) {
           const stage = data.timelineStages[i];
+          
+          if (quotaExceeded) {
+            // Use fallback immediately if we already know quota is gone
+            const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
+            setFutureSelf((prev) => {
+              if (!prev || !prev.timelineStages) return prev;
+              const updatedStages = [...prev.timelineStages];
+              updatedStages[i] = { ...updatedStages[i], imageUrl: stageFallbackUrl };
+              return { ...prev, timelineStages: updatedStages };
+            });
+            continue;
+          }
+
           const stageImageParts: any[] = [
             { text: `A high-fidelity, photorealistic digital avatar representing this future self at +${stage.years} years: ${stage.visualDescription}. Focus on advanced realistic facial features, age-appropriate skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
           ];
@@ -2004,28 +2062,36 @@ function AppContent() {
             });
           }
 
-          const stageImageResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash-image",
-            contents: { parts: stageImageParts },
-            config: {
-              imageConfig: {
-                aspectRatio: "1:1",
-              },
-            },
-          });
+          try {
+            // Add a small delay between stage generations to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-          for (const part of stageImageResponse.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-              const stageImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-              setFutureSelf((prev) => {
-                if (!prev || !prev.timelineStages) return prev;
-                const updatedStages = [...prev.timelineStages];
-                updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
-                const updated = { ...prev, timelineStages: updatedStages };
-                return updated;
-              });
-              break;
+            const stageImageResponse = await generateWithRetry(stageImageParts, `timeline stage ${i}`);
+
+            for (const part of stageImageResponse.candidates?.[0]?.content?.parts || []) {
+              if (part.inlineData) {
+                const stageImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+                setFutureSelf((prev) => {
+                  if (!prev || !prev.timelineStages) return prev;
+                  const updatedStages = [...prev.timelineStages];
+                  updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
+                  return { ...prev, timelineStages: updatedStages };
+                });
+                break;
+              }
             }
+          } catch (err) {
+            console.warn(`Stage ${i} generation failed, using fallback:`, err);
+            if (isQuotaExceeded(err)) {
+              quotaExceeded = true;
+            }
+            const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
+            setFutureSelf((prev) => {
+              if (!prev || !prev.timelineStages) return prev;
+              const updatedStages = [...prev.timelineStages];
+              updatedStages[i] = { ...updatedStages[i], imageUrl: stageFallbackUrl };
+              return { ...prev, timelineStages: updatedStages };
+            });
           }
         }
       } catch (imageError) {
@@ -2053,91 +2119,54 @@ function AppContent() {
         {step === "entry" && (
           <motion.div
             key="entry"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            className="w-full max-w-2xl text-center space-y-16 relative z-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-xl text-center space-y-12 relative z-10"
           >
-            <div className="space-y-8">
-              {callError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm mb-8 backdrop-blur-xl"
-                >
-                  {callError}
-                </motion.div>
-              )}
-              
+            <div className="space-y-12">
               <div className="relative">
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    opacity: [0.2, 0.4, 0.2]
-                  }}
-                  transition={{ duration: 6, repeat: Infinity }}
-                  className="w-48 h-48 bg-white/10 rounded-full mx-auto blur-3xl absolute left-1/2 -translate-x-1/2 -top-12"
-                />
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="relative"
+                  className="space-y-4"
                 >
-                  <h1 className="text-4xl md:text-8xl font-serif italic tracking-tight leading-[0.9]">
-                    Your future self <br /> 
-                    <span className="text-white/40">is calling.</span>
+                  <h1 className="text-6xl md:text-8xl font-sans font-light tracking-tighter leading-none">
+                    Temporal <br />
+                    <span className="text-white/30 italic">Reflection</span>
                   </h1>
+                  <p className="text-xs font-mono uppercase tracking-[0.5em] text-white/20">A Digital Mirror of Your Future</p>
                 </motion.div>
               </div>
               
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="max-w-sm mx-auto space-y-4 pt-8"
+                transition={{ delay: 0.2 }}
+                className="max-w-xs mx-auto space-y-4 pt-4"
               >
-                <div className="relative group">
-                  <input
-                    type="text"
-                    placeholder="Your Name"
-                    value={profile.name}
-                    onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
-                  />
-                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
-                </div>
-                <div className="relative group">
-                  <input
-                    type="text"
-                    placeholder="Your Passion (e.g. Art, Tech, Nature)"
-                    value={profile.passion}
-                    onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-8 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all text-center text-lg placeholder:text-white/20"
-                  />
-                  <div className="absolute inset-0 rounded-2xl border border-white/0 group-focus-within:border-white/20 pointer-events-none transition-all" />
-                </div>
-              </motion.div>
-
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
-                className="text-white/30 font-mono uppercase tracking-[0.6em] text-[9px] pt-4 flex flex-col items-center gap-2"
-              >
-                <div>Temporal Link Status: <span className="text-white/60">Ready</span></div>
-                <div className="flex items-center gap-2">
-                  <Heart className={cn("w-3 h-3", lives === 0 ? "text-red-500" : "text-white/40")} />
-                  <span>{lives} / 3 Daily Tokens Available</span>
-                </div>
+                <input
+                  type="text"
+                  placeholder="Identity"
+                  value={profile.name}
+                  onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
+                />
+                <input
+                  type="text"
+                  placeholder="Passion"
+                  value={profile.passion}
+                  onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
+                />
               </motion.div>
             </div>
 
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="space-y-8"
+              transition={{ delay: 0.4 }}
+              className="pt-8 flex flex-col items-center gap-6"
             >
               <button
                 onClick={async () => {
@@ -2147,33 +2176,18 @@ function AppContent() {
                     setStep("choose-future");
                   }
                 }}
-                className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-medium group relative overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                className="minimal-reflection px-12 py-6 bg-white text-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all text-sm font-bold uppercase tracking-[0.4em] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
               >
-                <span className="relative z-10 flex items-center">
-                  {hasApiKey === false ? "Initialize Link" : "Accept Call"} 
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
-                </span>
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                />
+                Initiate Sync
               </button>
 
-              <div className="flex flex-col items-center gap-4">
-                {hasApiKey === false && (
-                  <p className="text-white/30 text-[10px] font-mono uppercase tracking-widest max-w-xs leading-relaxed">
-                    A paid Gemini API key is required to synthesize temporal video data.
-                  </p>
-                )}
-
-                {hasSavedProfile && (
-                  <button
-                    onClick={() => setStep("takeaway")}
-                    className="text-white/40 hover:text-white transition-colors font-mono uppercase tracking-widest text-[10px] border-b border-white/10 pb-1"
-                  >
-                    View Previous Reflection
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                Invite Others
+              </button>
             </motion.div>
           </motion.div>
         )}
@@ -2181,54 +2195,36 @@ function AppContent() {
         {step === "choose-future" && (
           <motion.div
             key="choose-future"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             className="w-full max-w-4xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Select Destination</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Coordinate Selection</p>
+              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Temporal Horizon</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Select the depth of your reflection</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
-                { id: "1-year", label: "1 Year", desc: "Immediate path.", icon: <Clock className="w-6 h-6" /> },
-                { id: "5-years", label: "5 Years", desc: "Mid-term evolution.", icon: <Zap className="w-6 h-6" /> },
-                { id: "goal", label: "Goal Achieved", desc: "Ultimate success.", icon: <Target className="w-6 h-6" /> }
-              ].map((opt) => (
-                <button
-                  key={opt.id}
+                { id: "1-year", label: "Near Future", sub: "1 Year Ahead" },
+                { id: "5-years", label: "Distant Horizon", sub: "5 Years Ahead" },
+                { id: "goal-achieved", label: "Peak Realization", sub: "Goal Achieved" }
+              ].map((choice, i) => (
+                <motion.button
+                  key={choice.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
                   onClick={() => {
-                    setProfile(prev => ({ ...prev, futureChoice: opt.id as any }));
+                    setProfile(p => ({ ...p, futureChoice: choice.id as any }));
                     setStep("choose-response");
                   }}
-                  className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
-                    profile.futureChoice === opt.id 
-                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
-                  )}
+                  className="glass-card p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
-                  <div className={cn(
-                    "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
-                    profile.futureChoice === opt.id ? "bg-black/10 scale-110" : "bg-white/5 group-hover:scale-110"
-                  )}>
-                    {opt.icon}
-                  </div>
-                  <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
-                    <p className={cn(
-                      "text-xs md:text-sm leading-relaxed",
-                      profile.futureChoice === opt.id ? "text-black/60" : "text-white/40"
-                    )}>{opt.desc}</p>
-                  </div>
-                  
-                  <div className={cn(
-                    "absolute bottom-0 left-0 h-1 bg-current transition-all duration-500",
-                    profile.futureChoice === opt.id ? "w-full" : "w-0 group-hover:w-12"
-                  )} />
-                </button>
+                  <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
+                  <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
+                </motion.button>
               ))}
             </div>
           </motion.div>
@@ -2237,102 +2233,65 @@ function AppContent() {
         {step === "choose-response" && (
           <motion.div
             key="choose-response"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             className="w-full max-w-2xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight text-glow">Interface</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Communication Mode</p>
+              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Interface</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Communication Mode</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {[
-                { id: "voice", label: "Voice", desc: "Real-time audio.", icon: <Mic className="w-6 h-6" /> },
-                { id: "text", label: "Text", desc: "Neural transmission.", icon: <MessageSquare className="w-6 h-6" /> }
-              ].map((opt) => (
-                <button
-                  key={opt.id}
+                { id: "voice", label: "Voice", sub: "Real-time audio" },
+                { id: "text", label: "Text", sub: "Neural transmission" }
+              ].map((choice, i) => (
+                <motion.button
+                  key={choice.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
                   onClick={() => {
-                    setProfile(prev => ({ ...prev, responseMode: opt.id as any }));
+                    setProfile(p => ({ ...p, responseMode: choice.id as any }));
                     setStep("take-selfie");
                   }}
-                  className={cn(
-                    "p-6 md:p-10 rounded-[24px] md:rounded-[32px] border transition-all text-left space-y-4 md:space-y-6 group relative overflow-hidden",
-                    profile.responseMode === opt.id 
-                      ? "bg-white text-black border-white shadow-[0_0_40px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/[0.08]"
-                  )}
+                  className="glass-card p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
-                  <div className={cn(
-                    "w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
-                    profile.responseMode === opt.id ? "bg-black/10 scale-110" : "bg-white/5 group-hover:scale-110"
-                  )}>
-                    {opt.icon}
-                  </div>
-                  <div className="space-y-1 md:space-y-2">
-                    <p className="font-medium text-lg md:text-xl leading-tight">{opt.label}</p>
-                    <p className={cn(
-                      "text-xs md:text-sm leading-relaxed",
-                      profile.responseMode === opt.id ? "text-black/60" : "text-white/40"
-                    )}>{opt.desc}</p>
-                  </div>
-                </button>
+                  <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
+                  <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
+                </motion.button>
               ))}
             </div>
-            <p className="text-center text-white/30 text-[9px] font-mono uppercase tracking-[0.4em]">
-              Note: You can toggle modes during active manifestation.
-            </p>
           </motion.div>
         )}
 
         {step === "take-selfie" && (
           <motion.div
             key="take-selfie"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            className="w-full max-w-3xl space-y-12 relative z-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-2xl text-center space-y-12 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-6xl font-serif italic tracking-tight text-glow">Biometric Sync</h2>
-              <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Temporal Mirror Calibration</p>
+              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Temporal Mirror</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Align your presence</p>
             </div>
 
-            <div className="relative aspect-[4/3] md:aspect-[16/9] max-w-2xl mx-auto rounded-[24px] md:rounded-[40px] overflow-hidden bg-white/5 border border-white/10 group shadow-2xl">
+            <div className="relative aspect-video w-full max-w-xl mx-auto rounded-3xl overflow-hidden border border-white/10 glass-card">
               {stream ? (
                 <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover mirror"
-                  />
-                  {/* Scanner HUD Overlay */}
-                  <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-72 h-96 border border-white/20 rounded-[120px] flex items-center justify-center relative">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-white text-black text-[8px] font-mono uppercase tracking-widest rounded-full">Align Face</div>
-                      <div className="w-full h-px bg-white/10 animate-pulse" />
-                      <div className="absolute inset-0 border-t-2 border-white/40 rounded-[120px] h-1/4" />
-                    </div>
-                  </div>
-                  
-                  {/* Scanning Line */}
-                  <motion.div 
-                    animate={{ top: ["0%", "100%"] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                    className="absolute left-0 right-0 h-px bg-white/40 shadow-[0_0_15px_white] z-20"
-                  />
-
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover mirror" />
+                  <div className="absolute inset-0 pointer-events-none border border-white/20 rounded-3xl" />
                   {countdown !== null && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-30">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-30">
                       <motion.span
                         key={countdown}
-                        initial={{ scale: 0, opacity: 0, rotate: -20 }}
-                        animate={{ scale: 1.5, opacity: 1, rotate: 0 }}
-                        className="text-[12rem] font-serif italic text-white text-glow"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="text-9xl font-sans font-light text-white"
                       >
                         {countdown}
                       </motion.span>
@@ -2341,57 +2300,42 @@ function AppContent() {
                 </>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-8">
-                  <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center relative">
-                    <Camera className="w-10 h-10 text-white/20" />
-                    <motion.div 
-                      animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute inset-0 border border-white/20 rounded-full"
-                    />
-                  </div>
+                  <Camera className="w-12 h-12 text-white/10" />
                   <button
                     onClick={startCamera}
-                    className="px-10 py-5 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
+                    className="px-10 py-5 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-xs font-bold uppercase tracking-widest"
                   >
-                    Enable Temporal Mirror
+                    Enable Mirror
                   </button>
                 </div>
               )}
               <canvas ref={canvasRef} className="hidden" />
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6">
               {stream ? (
-                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                <>
                   <button
                     onClick={startCountdown}
                     disabled={countdown !== null}
-                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-lg font-bold shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50"
+                    className="minimal-reflection px-12 py-6 bg-white text-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all text-sm font-bold uppercase tracking-[0.4em] disabled:opacity-50"
                   >
-                    Capture Identity
+                    Capture
                   </button>
                   <button
                     onClick={skipSelfie}
-                    className="w-full md:w-auto px-12 py-6 bg-white/5 border border-white/10 rounded-full font-bold uppercase tracking-[0.3em] text-[10px] hover:bg-white/10 transition-all"
+                    className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[10px]"
                   >
-                    Skip
+                    Skip Biometrics
                   </button>
-                </div>
+                </>
               ) : (
-                <div className="flex flex-col items-center gap-6 w-full">
-                  <button
-                    onClick={startCamera}
-                    className="w-full md:w-auto px-12 py-6 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-sm font-bold shadow-xl"
-                  >
-                    Enable Camera
-                  </button>
-                  <button
-                    onClick={skipSelfie}
-                    className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[9px] border-b border-white/5 pb-1"
-                  >
-                    Proceed without Biometrics
-                  </button>
-                </div>
+                <button
+                  onClick={skipSelfie}
+                  className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[10px]"
+                >
+                  Proceed without Mirror
+                </button>
               )}
             </div>
           </motion.div>
@@ -2400,182 +2344,95 @@ function AppContent() {
         {step === "transformation" && (
           <motion.div
             key="transformation"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="w-full max-w-2xl text-center space-y-16 relative z-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-xl text-center space-y-16 relative z-10"
           >
-            <div className="relative w-80 h-80 mx-auto">
-              {/* Outer Ring */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 border border-dashed border-white/5 rounded-full"
-              />
-              {/* Middle Ring */}
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-10 border border-dashed border-white/10 rounded-full"
-              />
-              {/* Inner Ring */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-20 border border-white/20 rounded-full"
-              />
-              
-              {/* Pulsing Core */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.15, 1],
-                    opacity: [0.4, 0.8, 0.4],
-                    boxShadow: ["0 0 40px rgba(255,255,255,0.1)", "0 0 100px rgba(255,255,255,0.3)", "0 0 40px rgba(255,255,255,0.1)"]
-                  }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-32 h-32 bg-white/5 rounded-full flex items-center justify-center backdrop-blur-3xl border border-white/10"
-                >
-                  <div className="relative">
-                    <RefreshCw className="w-12 h-12 text-white animate-spin opacity-40" />
-                    <motion.div 
-                      animate={{ opacity: [0, 1, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute inset-0 flex items-center justify-center"
-                    >
-                      <Zap className="w-6 h-6 text-white" />
-                    </motion.div>
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Orbiting Particles */}
-              {[...Array(5)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 5 + i * 2, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0"
-                >
-                  <div 
-                    className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_15px_white]" 
-                    style={{ opacity: 0.2 + (i * 0.15) }}
-                  />
-                </motion.div>
-              ))}
-            </div>
-
             <div className="space-y-8">
-              <div className="space-y-2">
-                <h2 className="text-5xl md:text-6xl font-serif italic tracking-tight text-glow">Synthesizing Identity</h2>
-                <p className="text-white/40 font-light italic">Stabilizing temporal bridge for {profile.name}...</p>
+              <div className="relative w-48 h-48 mx-auto">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 border border-white/5 rounded-full"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <motion.div
+                    animate={{ opacity: [0.2, 0.5, 0.2] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="w-24 h-24 bg-white/5 rounded-full blur-2xl"
+                  />
+                  <RefreshCw className="w-8 h-8 text-white/20 animate-spin" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Synthesizing</h2>
+                <p className="text-xs font-mono uppercase tracking-[0.5em] text-white/20">Stabilizing temporal bridge</p>
               </div>
               
-              <div className="space-y-6">
-                <div className="flex justify-between items-end max-w-xs mx-auto px-1">
-                  <p className="text-[9px] font-mono uppercase tracking-[0.4em] text-white/40">
-                    {generationStage || "Manifesting"}
-                  </p>
-                  <p className="text-[9px] font-mono text-white/60">
-                    {Math.round(videoProgressPercent)}%
-                  </p>
+              <div className="max-w-xs mx-auto space-y-2">
+                <div className="flex justify-between text-[8px] font-mono uppercase tracking-widest text-white/20">
+                  <span>{generationStage || "Manifesting"}</span>
+                  <span>{Math.round(videoProgressPercent)}%</span>
                 </div>
-                <div className="h-1.5 w-80 bg-white/5 rounded-full mx-auto overflow-hidden relative border border-white/5">
+                <div className="h-px w-full bg-white/10 relative overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${videoProgressPercent}%` }}
-                    className="absolute inset-y-0 left-0 bg-white shadow-[0_0_15px_white]"
-                  />
-                  <motion.div
-                    animate={{ x: ["-100%", "200%"] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    className="absolute inset-y-0 left-0 bg-white"
                   />
                 </div>
               </div>
             </div>
-
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5 }}
-              className="max-w-md mx-auto p-6 glass-card"
-            >
-              <p className="text-white/60 text-sm leading-relaxed font-light">
-                "Your future self is being constructed from the threads of your current passion for <span className="text-white font-medium italic">{profile.passion}</span>. Please remain present as the manifestation stabilizes."
-              </p>
-            </motion.div>
           </motion.div>
         )}
 
         {step === "incoming-call" && (
           <motion.div
             key="incoming-call"
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 1.1, y: -20 }}
-            className="w-full max-w-md glass-card p-12 text-center space-y-12 relative overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-between p-12 md:p-24"
           >
-            {/* Pulsing Background Ring */}
-            <motion.div
-              animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.3, 0.1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0 bg-white/5 rounded-full pointer-events-none"
-            />
-            
-            <div className="space-y-8 relative z-10">
-              <div className="relative">
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.1, 1],
-                    rotate: [0, 5, -5, 0]
-                  }}
-                  transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-32 h-32 rounded-full bg-white/10 mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.1)]"
-                >
-                  <Phone className="w-12 h-12 text-white" />
-                </motion.div>
-                {/* Ringing Waves */}
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.5, ease: "easeOut" }}
-                    className="absolute inset-0 border border-white/20 rounded-full pointer-events-none"
-                  />
-                ))}
-              </div>
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
+              <TemporalGrid />
+            </div>
 
-              <div className="space-y-3">
-                <h2 className="text-4xl font-serif italic tracking-tight">Incoming Call</h2>
-                <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px] font-bold">Future Self Manifestation</p>
+            <div className="relative z-10 flex flex-col items-center space-y-8 mt-12">
+              <motion.div 
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  boxShadow: ["0 0 0px rgba(255,255,255,0)", "0 0 40px rgba(255,255,255,0.2)", "0 0 0px rgba(255,255,255,0)"]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-32 h-32 md:w-40 md:h-40 bg-white/5 rounded-full flex items-center justify-center border border-white/10 backdrop-blur-xl"
+              >
+                <Phone className="w-12 h-12 md:w-16 md:h-16 text-white" />
+              </motion.div>
+              <div className="text-center space-y-3">
+                <h2 className="text-4xl md:text-6xl font-serif italic tracking-tighter text-glow">Future Self</h2>
+                <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/30">Temporal Link Request</p>
               </div>
             </div>
 
-            <div className="flex justify-center gap-12 relative z-10">
-              <button
-                onClick={() => setStep("entry")}
-                className="group relative"
-              >
-                <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-[0_0_40px_rgba(239,68,68,0.4)]">
-                  <PhoneOff className="w-8 h-8 text-white" />
-                </div>
-                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-mono uppercase tracking-widest text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">Decline</span>
-              </button>
-
+            <div className="relative z-10 w-full max-w-sm flex flex-col md:flex-row gap-6 mb-12">
               <button
                 onClick={startCall}
-                className="group relative"
+                className="flex-1 py-6 md:py-8 bg-green-500 text-white rounded-full text-sm font-bold uppercase tracking-[0.4em] shadow-[0_0_50px_rgba(34,197,94,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-4"
               >
-                <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-[0_0_40px_rgba(34,197,94,0.4)]">
-                  <Phone className="w-8 h-8 text-white" />
-                </div>
-                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-mono uppercase tracking-widest text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">Accept</span>
+                <Phone className="w-5 h-5" fill="currentColor" />
+                Accept
               </button>
-            </div>
-
-            <div className="pt-8 border-t border-white/5 relative z-10">
-              <p className="text-white/20 text-[10px] font-mono uppercase tracking-widest">Secure Temporal Link Established</p>
+              <button
+                onClick={() => setStep("entry")}
+                className="flex-1 py-6 md:py-8 bg-red-500/20 border border-red-500/30 text-red-500 rounded-full text-sm font-bold uppercase tracking-[0.4em] hover:bg-red-500/30 transition-all flex items-center justify-center gap-4"
+              >
+                <PhoneOff className="w-5 h-5" fill="currentColor" />
+                Decline
+              </button>
             </div>
           </motion.div>
         )}
@@ -2588,299 +2445,168 @@ function AppContent() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden"
           >
-            {/* Holographic Scanline Overlay */}
-            <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] z-10" />
-            <div className="scan-line opacity-20" />
-            
-            <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
-              {/* User Side */}
-              <motion.div 
-                initial={{ x: -100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="relative flex-1 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-white/5 overflow-hidden z-0"
-              >
-                <UserVideo stream={userStream} isCameraOn={isCameraOn} />
-                
-                {/* HUD Elements for User */}
-                <div className="absolute top-8 left-8 z-20 space-y-4">
-                  <StatusBadge label="Identity" value="Past Self" icon={User} />
-                  <StatusBadge label="Location" value="Present Day" icon={Clock} />
-                  <StatusBadge 
-                    label="Temporal Energy" 
-                    value={`${lives} Tokens Left`} 
-                    icon={Heart} 
-                    color={lives === 1 ? "text-red-400" : "text-white/60"}
-                  />
+            {callError ? (
+              <div className="flex flex-col items-center gap-6 p-12 glass-card max-w-md mx-auto text-center z-50">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
-              </motion.div>
-
-              {/* Future Self Side */}
-              <motion.div 
-                initial={{ x: 100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="relative flex-1 h-1/2 md:h-full overflow-hidden bg-black flex items-center justify-center z-0"
-              >
-                {futureSelf?.videoUrl ? (
-                  <FutureVideo 
-                    videoUrl={futureSelf.videoUrl} 
-                    isSpeaking={isSpeaking} 
-                    outputVolume={outputVolume} 
-                  />
-                ) : futureSelf?.imageUrl ? (
-                  <motion.img
-                    src={futureSelf.imageUrl}
-                    alt="Future Self"
-                    className="w-full h-full object-cover"
-                    animate={{
-                      scale: isSpeaking ? [1, 1.03, 1] : [1, 1.01, 1],
-                      filter: isSpeaking ? "brightness(1.1) saturate(1.1)" : "brightness(1) saturate(1)",
-                    }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="relative">
-                      <div className="w-16 h-16 border-2 border-white/10 border-t-white animate-spin rounded-full" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <RefreshCw className="w-6 h-6 text-white/40" />
+                <div className="space-y-2">
+                  <h3 className="text-xl font-sans font-light">Temporal Link Failed</h3>
+                  <div className="text-sm text-white/40 font-light leading-relaxed">{callError}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsCallActive(false);
+                    setCallError(null);
+                    setStep("incoming-call");
+                  }}
+                  className="px-8 py-3 bg-white text-black rounded-full text-sm font-medium hover:scale-105 transition-all"
+                >
+                  Return
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
+                  {/* Future Self Side (Main Focus) */}
+                  <div className="relative flex-1 h-full overflow-hidden bg-black flex items-center justify-center order-1 md:order-2">
+                    <FutureVideo 
+                      videoUrl={futureSelf?.videoUrl || null} 
+                      imageUrl={futureSelf?.imageUrl || null}
+                      isSpeaking={isSpeaking} 
+                      outputVolume={outputVolume} 
+                    />
+                    {!futureSelf?.videoUrl && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-sm z-10">
+                        <RefreshCw className="w-6 h-6 text-white/40 animate-spin" />
+                        <p className="text-[8px] font-mono uppercase tracking-[0.5em] text-white/40">Manifesting Video...</p>
                       </div>
+                    )}
+                    <div className="absolute top-6 right-6 md:top-8 md:right-8 z-20 space-y-1 text-right">
+                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Future Reflection</div>
+                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">Horizon: {profile.futureChoice}</div>
                     </div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/40 animate-pulse">Manifesting Identity...</p>
                   </div>
-                )}
 
-                {/* HUD Elements for Future Self */}
-                <div className="absolute top-8 right-8 z-20 space-y-4 flex flex-col items-end">
-                  <StatusBadge 
-                    label="Identity" 
-                    value="Future Manifestation" 
-                    icon={Zap} 
-                    color={isSpeaking ? "text-green-400" : "text-white/60"}
-                  />
-                  <StatusBadge label="Temporal Offset" value="+15 Years" icon={Clock} />
-                  <StatusBadge 
-                    label="Sync Limit" 
-                    value={`${questionsRemaining} Questions`} 
-                    icon={MessageSquare} 
-                    color={questionsRemaining <= 1 ? "text-orange-400" : "text-white/60"}
-                  />
+                  {/* User Side (PiP on Mobile, Split on Desktop) */}
+                  <div className={cn(
+                    "transition-all duration-700 overflow-hidden z-40",
+                    "fixed bottom-32 right-6 w-32 h-48 rounded-2xl border border-white/20 shadow-2xl", // Mobile PiP
+                    "md:relative md:bottom-auto md:right-auto md:w-auto md:h-full md:flex-1 md:rounded-none md:border-0 md:border-r md:border-white/5 md:shadow-none", // Desktop Split
+                    "order-2 md:order-1"
+                  )}>
+                    <UserVideo stream={userStream} isCameraOn={isCameraOn} />
+                    <div className="absolute top-3 left-3 md:top-8 md:left-8 z-20 space-y-1">
+                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Past Identity</div>
+                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">{profile.name}</div>
+                    </div>
+                  </div>
                 </div>
 
-                {isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 w-full max-w-xs px-8">
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="w-3 h-3 text-white animate-spin" />
-                        <span className="text-[9px] font-mono uppercase tracking-widest text-white/70">Updating Manifestation</span>
-                      </div>
-                      <span className="text-[9px] font-mono text-white/80">{Math.round(videoProgressPercent)}%</span>
-                    </div>
-                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
-                      <motion.div 
-                        className="h-full bg-white shadow-[0_0_10px_white]"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${videoProgressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Transcription Overlay */}
+                <div className="absolute bottom-32 md:bottom-40 left-0 right-0 px-8 md:px-12 flex flex-col items-center pointer-events-none z-20">
+                  <AnimatePresence mode="wait">
+                    {chatMessages.length > 0 && (
+                      <motion.div
+                        key={chatMessages.length}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="max-w-3xl text-center"
+                      >
+                        <p className={cn(
+                          "text-lg md:text-2xl font-sans font-light leading-relaxed",
+                          chatMessages[chatMessages.length - 1].role === "model" ? "text-white" : "text-white/40"
+                        )}>
+                          {chatMessages[chatMessages.length - 1].text}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-                {!futureSelf?.videoUrl && !isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
+                {/* Controls */}
+                <div className="absolute bottom-8 md:bottom-12 left-0 right-0 flex flex-col items-center gap-6 z-30 px-6">
+                  <div className="flex items-center gap-4 md:gap-8 bg-black/60 backdrop-blur-2xl border border-white/10 p-2 md:p-3 rounded-full shadow-2xl">
                     <button
-                      onClick={() => generateFutureVideo()}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
+                      onClick={toggleMute}
+                      className={cn(
+                        "p-3 md:p-4 rounded-full transition-all",
+                        isMuted ? "bg-red-500/20 text-red-500" : "text-white/40 hover:text-white"
+                      )}
                     >
-                      <Video className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Manifest Video</span>
+                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </button>
-                  </div>
-                )}
-
-                {futureSelf?.videoUrl && !isGeneratingVideo && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 flex gap-4">
+                    
                     <button
-                      onClick={() => generateFutureVideo('sing')}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                    >
-                      <Music className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Sing</span>
-                    </button>
-                    <button
-                      onClick={() => generateFutureVideo('dance')}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-2xl rounded-full border border-white/10 transition-all group shadow-2xl"
-                    >
-                      <Zap className="w-4 h-4 text-white/60 group-hover:text-white" />
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/60 group-hover:text-white">Dance</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Subtle Vignette */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
-              </motion.div>
-            </div>
-
-            {/* Central Content: The Orb & Transcription */}
-            <div className="relative z-20 flex flex-col items-center justify-center space-y-12 w-full h-full pointer-events-none">
-              <div className="text-center space-y-3 pointer-events-auto">
-                {callError ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-8 glass-card max-w-md border-red-500/30"
-                  >
-                    <p className="text-red-400 font-medium mb-6">{callError}</p>
-                    <button 
                       onClick={endCall}
-                      className="w-full py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
+                      className="p-5 md:p-6 bg-red-500 text-white rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_30px_rgba(239,68,68,0.4)]"
                     >
-                      Close Connection
+                      <PhoneOff className="w-6 h-6" fill="currentColor" />
                     </button>
-                  </motion.div>
-                ) : (
-                  <div className="flex flex-col items-center">
-                    <div className="flex items-center justify-center gap-3 mb-4 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
-                      <motion.div 
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                      />
-                      <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/80 font-bold">Temporal Stream Active</span>
-                    </div>
-                    <motion.h2 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-2xl font-serif italic tracking-tight text-white/90"
+
+                    <button
+                      onClick={toggleCamera}
+                      className={cn(
+                        "p-4 rounded-full transition-all",
+                        !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/40 hover:text-white"
+                      )}
                     >
-                      {profile.name} <span className="text-white/40">Manifestation</span>
-                    </motion.h2>
+                      {!isCameraOn ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                    </button>
                   </div>
-                )}
-              </div>
 
-              {!callError && profile.responseMode === "voice" && (
-                <div className="pointer-events-auto">
-                  <VoiceOrb 
-                    isSpeaking={isSpeaking} 
-                    isListening={isListening} 
-                    isThinking={isChatLoading} 
-                    volume={outputVolume}
-                  />
+                  {profile.responseMode === "text" && (
+                    <div className="flex items-center gap-3 bg-black/40 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl w-full max-w-md">
+                      <input
+                        type="text"
+                        value={userResponse}
+                        onChange={(e) => setUserResponse(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
+                        placeholder="Type message..."
+                        className="flex-1 bg-transparent border-none px-4 py-2 focus:outline-none text-sm"
+                      />
+                      <button
+                        onClick={() => {
+                          handleNextCallStep(userResponse);
+                          setUserResponse("");
+                        }}
+                        disabled={!userResponse || isAITyping}
+                        className="p-3 bg-white text-black rounded-xl disabled:opacity-50"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* Transcription Area */}
-              <div className="absolute bottom-48 left-0 right-0 px-12 flex flex-col items-center pointer-events-none z-20">
-                <AnimatePresence mode="wait">
-                  {chatMessages.length > 0 && (
-                    <motion.div
-                      key={chatMessages.length}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="max-w-3xl text-center"
-                    >
-                      <p className={cn(
-                        "text-xl md:text-3xl font-serif italic leading-relaxed drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]",
-                        chatMessages[chatMessages.length - 1].role === "model" ? "text-white text-glow" : "text-white/50"
-                      )}>
-                        {chatMessages[chatMessages.length - 1].text}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Call Controls Bar */}
-            <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-8 z-30 px-8">
-              <div className="flex items-center gap-6 bg-black/60 backdrop-blur-2xl border border-white/10 p-3 rounded-full shadow-2xl">
-                <button
-                  onClick={toggleMute}
-                  className={cn(
-                    "p-4 rounded-full transition-all hover:bg-white/5",
-                    isMuted ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                  )}
-                >
-                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                </button>
-                
-                <button
-                  onClick={toggleCamera}
-                  className={cn(
-                    "p-4 rounded-full transition-all hover:bg-white/5",
-                    !isCameraOn ? "bg-red-500/20 text-red-500" : "text-white/60 hover:text-white"
-                  )}
-                >
-                  {!isCameraOn ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                </button>
-
-                <button
-                  onClick={endCall}
-                  className="p-6 bg-white text-black rounded-full hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.4)]"
-                >
-                  <PhoneOff className="w-8 h-8" fill="currentColor" />
-                </button>
-              </div>
-
-              {profile.responseMode === "text" && (
-                <div className="flex-1 max-w-lg flex gap-3">
-                  <input
-                    type="text"
-                    value={userResponse}
-                    onChange={(e) => setUserResponse(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
-                    placeholder="Message your future self..."
-                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-5 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all text-base backdrop-blur-xl"
-                  />
-                  <button
-                    onClick={() => handleNextCallStep(userResponse)}
-                    disabled={!userResponse || isAITyping}
-                    className="p-5 bg-white text-black rounded-2xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all shadow-xl"
-                  >
-                    <Send className="w-6 h-6" />
-                  </button>
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </motion.div>
         )}
 
         {step === "ended" && (
           <motion.div
             key="ended"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="w-full max-w-2xl text-center space-y-16 relative z-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-md text-center space-y-12 relative z-10"
           >
             <div className="space-y-8">
-              <div className="relative w-32 h-32 mx-auto">
-                <motion.div 
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.3, 0.1] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute inset-0 bg-white/20 rounded-full blur-2xl"
-                />
-                <div className="relative w-full h-full rounded-full bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-xl">
-                  <PhoneOff className="w-12 h-12 text-white/60" />
-                </div>
+              <div className="w-24 h-24 bg-white/5 rounded-full mx-auto flex items-center justify-center">
+                <PhoneOff className="w-8 h-8 text-white/20" />
               </div>
-              <div className="space-y-4">
-                <h2 className="text-6xl md:text-7xl font-serif italic tracking-tight text-glow">Call Ended</h2>
-                <p className="text-white/40 font-mono uppercase tracking-[0.4em] text-[10px]">Connection Closed</p>
+              <div className="space-y-2">
+                <h2 className="text-4xl font-sans font-light tracking-tighter">Connection Closed</h2>
+                <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Temporal Link Terminated</p>
               </div>
-              <p className="text-white/60 font-light text-lg max-w-md mx-auto leading-relaxed">
-                The temporal link has been closed. Your future manifestation has been archived.
-              </p>
             </div>
 
             <button
               onClick={() => setStep("takeaway")}
-              className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-2xl font-bold group shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+              className="minimal-reflection w-full py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em]"
             >
-              View Reflection <ArrowRight className="inline-block ml-3 w-6 h-6 group-hover:translate-x-2 transition-transform" />
+              View Reflection
             </button>
           </motion.div>
         )}
@@ -2888,186 +2614,61 @@ function AppContent() {
         {step === "takeaway" && futureSelf && (
           <motion.div
             key="takeaway"
-            initial={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-16 items-start relative z-10 py-12"
+            className="w-full max-w-5xl space-y-24 relative z-10 py-24"
           >
-            <div className="space-y-20">
-              <div className="space-y-10">
-                <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-[0.4em] text-white/60 backdrop-blur-xl">
-                  <Target className="w-4 h-4 text-white" /> Your Path
-                </div>
-                <div className="space-y-6">
-                  <h1 className="text-8xl md:text-[12rem] font-serif italic leading-[0.7] tracking-tighter text-glow">
-                    Future <br /> <span className="text-white/10">Reflection</span>
-                  </h1>
-                  <p className="text-white/40 font-mono uppercase tracking-[0.6em] text-[10px] pl-2">ID: #TM-2041-A</p>
-                </div>
-              </div>
+            <div className="text-center space-y-6">
+              <h1 className="text-6xl md:text-8xl font-sans font-light tracking-tighter">Future Reflection</h1>
+              <p className="text-xs font-mono uppercase tracking-[0.6em] text-white/20">Temporal Node: {profile.name}</p>
+            </div>
 
-              <div className="grid grid-cols-1 gap-16">
-                <div className="glass-card p-16 space-y-10 border-l-[12px] border-l-white relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Zap className="w-32 h-32 text-white" />
-                  </div>
-                  <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/40">The Manifested Vision</p>
-                  <p className="text-4xl md:text-5xl text-white leading-[1.1] font-serif italic tracking-tight">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="space-y-12">
+                <div className="glass-card p-12 space-y-8 minimal-reflection">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/20">The Narrative</div>
+                  <p className="text-2xl md:text-3xl text-white font-sans font-light leading-relaxed italic">
                     "{futureSelf.narrative}"
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  <div className="glass-card p-12 space-y-10 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-px bg-white/40" />
-                      <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/60">Action Protocol</p>
+                <div className="grid grid-cols-2 gap-6">
+                  {futureSelf.traits.map((trait) => (
+                    <div key={trait} className="p-6 bg-white/5 border border-white/5 rounded-2xl text-[10px] uppercase tracking-[0.2em] text-white/40 text-center">
+                      {trait}
                     </div>
-                    <div className="space-y-8">
-                      {futureSelf.recap?.actionSteps.map((step, i) => (
-                        <motion.div 
-                          key={i} 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.5 + i * 0.1 }}
-                          className="flex items-start gap-6 group"
-                        >
-                          <span className="text-[10px] font-mono text-white/20 mt-2">0{i + 1}</span>
-                          <p className="text-xl text-white/80 leading-snug font-light group-hover:text-white transition-colors">{step}</p>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="glass-card p-12 space-y-10 flex flex-col relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-px bg-white/40" />
-                      <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/60">Core Traits</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 flex-grow">
-                      {futureSelf.traits.map((trait) => (
-                        <div key={trait} className="p-4 bg-white/5 border border-white/5 rounded-xl text-[10px] uppercase tracking-[0.2em] text-white/40 text-center flex items-center justify-center hover:bg-white/10 hover:text-white transition-all">
-                          {trait}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-12 pt-12 border-t border-white/5">
-                <button
-                  onClick={() => setStep("entry")}
-                  className="px-16 py-8 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all flex items-center gap-4 text-2xl font-bold group shadow-[0_0_40px_rgba(255,255,255,0.3)]"
-                >
-                  New Connection <RefreshCw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-700" />
-                </button>
-                
-                <button 
-                  onClick={() => setIsShareModalOpen(true)} 
-                  className="flex items-center gap-3 text-[10px] uppercase tracking-[0.4em] text-white/40 hover:text-white transition-colors font-mono"
-                >
-                  <Download className="w-4 h-4" /> Export Path
-                </button>
-              </div>
-            </div>
-
-            <div className="lg:sticky lg:top-12 space-y-12">
-              <div className="relative aspect-[3/4] w-full group shadow-2xl">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`future-self-projection-${timelineIndex}`}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="absolute inset-0 rounded-[40px] overflow-hidden bg-white/5 flex items-center justify-center border border-white/10"
-                  >
-                    {(futureSelf.timelineStages?.[timelineIndex]?.imageUrl || futureSelf.imageUrl) ? (
-                      <img
-                        src={futureSelf.timelineStages?.[timelineIndex]?.imageUrl || futureSelf.imageUrl}
-                        alt="Future Self"
-                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 border-4 border-white/20 border-t-white animate-spin rounded-full" />
-                    )}
-
-                    {/* Hotspots */}
-                    {futureSelf.hotspots?.map((hotspot, i) => (
-                      <div
-                        key={i}
-                        className="absolute z-20"
-                        style={{ left: `${hotspot.x}%`, top: `${hotspot.y}%` }}
-                      >
-                        <button
-                          onMouseEnter={() => setActiveHotspot(i)}
-                          onMouseLeave={() => setActiveHotspot(null)}
-                          className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/40 rounded-full flex items-center justify-center hover:scale-125 hover:bg-white/40 transition-all group/hotspot"
-                        >
-                          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                          
-                          <AnimatePresence>
-                            {activeHotspot === i && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                                className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 w-56 p-6 glass-card text-left space-y-3 pointer-events-none z-50"
-                              >
-                                <p className="text-[10px] font-mono uppercase tracking-widest text-white/40">{hotspot.label}</p>
-                                <p className="text-xs text-white/80 leading-relaxed font-light">{hotspot.description}</p>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </button>
+              <div className="space-y-12">
+                <div className="glass-card p-12 space-y-10 minimal-reflection">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/20">Action Steps</div>
+                  <div className="space-y-8">
+                    {futureSelf.recap?.actionSteps.map((step, i) => (
+                      <div key={i} className="flex gap-6">
+                        <span className="text-[10px] font-mono text-white/20 mt-1">0{i + 1}</span>
+                        <p className="text-lg text-white/60 font-sans font-light leading-snug">{step}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
 
-                    {/* Timeline Slider Overlay */}
-                    <div className="absolute bottom-8 left-8 right-8 z-30 glass-card p-8 space-y-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 backdrop-blur-3xl">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-white/40">Timeline Exploration</p>
-                        <p className="text-sm font-serif italic text-white/80">
-                          +{futureSelf.timelineStages?.[timelineIndex]?.years} Years
-                        </p>
-                      </div>
-                      <div className="relative h-1.5 w-full bg-white/10 rounded-full">
-                        <div className="absolute inset-0 flex justify-between px-1">
-                          {futureSelf.timelineStages?.map((_, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setTimelineIndex(i)}
-                              className={cn(
-                                "w-4 h-4 -mt-1.5 rounded-full border-2 transition-all",
-                                timelineIndex === i 
-                                  ? "bg-white border-white scale-125 shadow-[0_0_15px_rgba(255,255,255,0.5)]" 
-                                  : "bg-black border-white/20 hover:border-white/40"
-                              )}
-                            />
-                          ))}
-                        </div>
-                        <motion.div 
-                          className="absolute top-0 left-0 h-full bg-white/40 rounded-full pointer-events-none"
-                          animate={{ width: `${(timelineIndex / ((futureSelf.timelineStages?.length || 1) - 1)) * 100}%` }}
-                        />
-                      </div>
-                      <AnimatePresence mode="wait">
-                        <motion.p
-                          key={timelineIndex}
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          className="text-[11px] text-white/60 leading-relaxed italic line-clamp-2 font-light"
-                        >
-                          {futureSelf.timelineStages?.[timelineIndex]?.narrative}
-                        </motion.p>
-                      </AnimatePresence>
-                    </div>
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                  </motion.div>
-                </AnimatePresence>
+                <div className="flex flex-col gap-4">
+                  <button
+                    onClick={() => setStep("entry")}
+                    className="minimal-reflection w-full py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em]"
+                  >
+                    New Connection
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="w-full py-6 bg-white/5 text-white/40 rounded-full text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-white/10 transition-all flex items-center justify-center gap-3"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Reflection
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
