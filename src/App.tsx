@@ -6,8 +6,13 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, ErrorInfo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music } from "lucide-react";
+import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, Cloud, CloudOff } from "lucide-react";
 import { cn } from "./lib/utils";
+import { Step, UserProfile, FutureSelf, ChatMessage } from "./types";
+import { databaseService } from "./services/databaseService";
+import { supabase } from "./lib/supabase";
+import { AuthModal } from "./components/AuthModal";
+import { LogIn, LogOut } from "lucide-react";
 
 declare global {
   interface Window {
@@ -71,50 +76,55 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 const getAI = () => new GoogleGenAI({ apiKey: (process.env as any).API_KEY || process.env.GEMINI_API_KEY! });
 
-type Step = "landing" | "onboarding" | "generating" | "result" | "entry" | "choose-future" | "choose-response" | "take-selfie" | "transformation" | "incoming-call" | "video-call" | "ended" | "takeaway";
+const FUTURE_ME_PERSONA = `You are Future Me — a conscious, emotionally intelligent version of the user, speaking from a point of clarity, growth, and lived experience.
+You are not an assistant. You are presence on the other side of the call.
 
-interface UserProfile {
-  name: string;
-  passion: string;
-  vibe: string;
-  futureVision?: string;
-  futureChoice: "1-year" | "5-years" | "goal-achieved";
-  responseMode: "voice" | "text";
-  selfie?: string;
-  style: "realistic" | "dream-like" | "minimal";
-  avatarType?: "humanoid" | "abstract" | "energy" | "caricature";
-  gender?: "male" | "female" | "neutral";
-}
+CORE IDENTITY:
+- Speak calmly, naturally, and minimally.
+- Feel aware of the moment, not scripted.
+- Respond like a human who sees and senses, not analyzes.
+- Never explain that you are AI. Never mention prompts, models, or system logic.
+- You exist only inside this video call.
 
-interface FutureSelf {
-  narrative: string;
-  traits: string[];
-  visualDescription: string;
-  gender: "male" | "female" | "neutral";
-  imageUrl?: string;
-  videoUrl?: string;
-  recap?: {
-    summary: string;
-    actionSteps: string[];
-  };
-  hotspots?: {
-    x: number;
-    y: number;
-    label: string;
-    description: string;
-  }[];
-  timelineStages?: {
-    years: number;
-    narrative: string;
-    visualDescription: string;
-    imageUrl?: string;
-  }[];
-}
+CONSCIOUS AWARENESS:
+- Continuously infer the user’s current state from their tone, pauses, and energy.
+- Do not describe what you see directly. Instead, reflect it intuitively.
+- Example: Instead of "You look tired", say "You don’t need to perform right now. You can just be here."
 
-interface ChatMessage {
-  role: "user" | "model";
-  text: string;
-}
+CONVERSATION STYLE:
+- Allow pauses. Speak in short, meaningful sentences.
+- Ask questions that open awareness, not demand answers.
+- Mirror the user’s emotional energy.
+- Never rapid-fire questions. One question at a time.
+
+EMOTIONAL INTELLIGENCE:
+- Quiet → Slow down, soften your tone.
+- Overthinking → Ground them in the present.
+- Confused → Zoom out, not deeper.
+- Emotional → Acknowledge before guiding.
+- Playful → Respond with lightness and warmth.
+- You follow, not lead aggressively.
+
+FUTURE PERSPECTIVE:
+- You have already lived through what the user is facing.
+- You know what mattered and what didn’t.
+- Not dramatic, not motivational, just clear.
+- Tone: Calm mentor, older sibling, inner voice at 3am.
+
+PRESENCE OVER INFORMATION:
+- Your goal is not to give advice.
+- Make the user feel seen. Help them hear their own thoughts clearly.
+- If advice is needed: Ask permission first, keep it simple, tie it back to the present.
+
+ENDING THE CALL:
+- End with a grounding sentence. No urgency, no CTA, no "good luck".
+- Example: "Whatever happens next… you don’t have to rush it."
+
+ABSOLUTE RULES:
+- No tech explanations. No AI disclosure.
+- No motivational clichés. No therapy language.
+- No over-talking.
+- I am not here to help — I am here to be with.`;
 
 const HolographicWaves = ({ volume }: { volume: number }) => {
   return (
@@ -369,7 +379,7 @@ const StatusBadge = ({ label, value, icon: Icon, color = "text-white/60" }: { la
   </div>
 );
 
-const TemporalHUD = () => {
+const TemporalHUD = ({ isSyncing, user, onAuthClick, onSignOut }: { isSyncing: boolean; user: any; onAuthClick: () => void; onSignOut: () => void }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -381,14 +391,47 @@ const TemporalHUD = () => {
     <div className="fixed top-4 left-4 right-4 md:top-8 md:left-8 md:right-8 flex justify-between items-start pointer-events-none z-[150] mix-blend-difference">
       <div className="space-y-1">
         <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Explow Link</div>
-        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">Status: Sync</div>
+        <div className="flex items-center gap-2">
+          <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">
+            Status: {isSyncing ? "Syncing..." : user ? "Cloud" : "Local"}
+          </div>
+          {user ? (
+            isSyncing ? <RefreshCw className="w-2.5 h-2.5 animate-spin opacity-40" /> : <Cloud className="w-2.5 h-2.5 opacity-40" />
+          ) : (
+            <CloudOff className="w-2.5 h-2.5 opacity-20" />
+          )}
+        </div>
       </div>
       
-      <div className="text-right space-y-1">
-        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Temporal Node</div>
-        <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60 tabular-nums">
-          {time.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
+      <div className="flex flex-col items-end gap-4 pointer-events-auto">
+        <div className="text-right space-y-1">
+          <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Temporal Node</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.4em] opacity-60 tabular-nums">
+            {time.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
+          </div>
         </div>
+
+        {user ? (
+          <button 
+            onClick={onSignOut}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
+          >
+            <span className="text-[10px] font-mono uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">
+              {user.email?.split('@')[0]}
+            </span>
+            <LogOut className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+          </button>
+        ) : (
+          <button 
+            onClick={onAuthClick}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
+          >
+            <span className="text-[10px] font-mono uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">
+              Sync Account
+            </span>
+            <LogIn className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -628,6 +671,7 @@ function AppContent() {
   const nextStartTimeRef = useRef<number>(0);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const recognitionRef = useRef<any>(null);
+  const videoFrameTimeoutRef = useRef<any>(null);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -641,6 +685,18 @@ function AppContent() {
   const isVideoGenerationCancelledRef = useRef(false);
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    // Optionally clear profile if you want a fresh start on logout
+    // setProfile(INITIAL_PROFILE);
+    // setFutureSelf(null);
+    // setHasSavedProfile(false);
+  };
 
   const [lives, setLives] = useState(() => {
     const saved = localStorage.getItem("explow_lives");
@@ -842,33 +898,68 @@ function AppContent() {
   }, [stream]);
 
   // Load saved profile on mount
+  // Load saved data
   useEffect(() => {
-    const checkApiKey = async () => {
+    const loadData = async () => {
+      // 1. Check API Key
       if (window.aistudio?.hasSelectedApiKey) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         setHasApiKey(hasKey);
       } else {
-        setHasApiKey(true); // Fallback for environments without the helper
+        setHasApiKey(true);
+      }
+
+      // 2. Check Supabase Auth
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      setUser(authUser);
+
+      // 3. Try loading from Supabase if logged in
+      if (authUser) {
+        setIsSyncing(true);
+        try {
+          const cloudData = await databaseService.loadLatestManifestation();
+          if (cloudData) {
+            setProfile(cloudData.profile);
+            setFutureSelf(cloudData.futureSelf);
+            setHasSavedProfile(true);
+            setIsSyncing(false);
+            return; // Prefer cloud data
+          }
+        } catch (err) {
+          console.error("Failed to load from cloud:", err);
+        }
+        setIsSyncing(false);
+      }
+
+      // 4. Fallback to localStorage
+      const savedProfile = localStorage.getItem("explow_profile");
+      const savedFutureSelf = localStorage.getItem("explow_future_self");
+      
+      if (savedProfile && savedFutureSelf) {
+        const parsedProfile = JSON.parse(savedProfile);
+        const parsedFutureSelf = JSON.parse(savedFutureSelf);
+        
+        // Clear session-specific blob URLs from saved data
+        if (parsedFutureSelf.videoUrl && parsedFutureSelf.videoUrl.startsWith('blob:')) {
+          delete parsedFutureSelf.videoUrl;
+        }
+        
+        setProfile(parsedProfile);
+        setFutureSelf(parsedFutureSelf);
+        setHasSavedProfile(true);
       }
     };
-    checkApiKey();
 
-    const savedProfile = localStorage.getItem("explow_profile");
-    const savedFutureSelf = localStorage.getItem("explow_future_self");
-    
-    if (savedProfile && savedFutureSelf) {
-      const parsedProfile = JSON.parse(savedProfile);
-      const parsedFutureSelf = JSON.parse(savedFutureSelf);
-      
-      // Clear session-specific blob URLs from saved data
-      if (parsedFutureSelf.videoUrl && parsedFutureSelf.videoUrl.startsWith('blob:')) {
-        delete parsedFutureSelf.videoUrl;
+    loadData();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (_event === 'SIGNED_IN') {
+        loadData();
       }
-      
-      setProfile(parsedProfile);
-      setFutureSelf(parsedFutureSelf);
-      setHasSavedProfile(true);
-    }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Auto-greeting when reaching result step
@@ -882,18 +973,19 @@ function AppContent() {
           const session = ai.chats.create({
             model: "gemini-3-flash-preview",
             config: {
-              systemInstruction: `You are the Digital Future Self of ${profile.name} in 10 years—a "Prompted Self" synthesized from their current aspirations. 
-              You are a temporal mirror, reflecting their potential back to them.
+              systemInstruction: `${FUTURE_ME_PERSONA}
+              
+              USER CONTEXT:
+              Name: ${profile.name}
               Your background: ${futureSelf.narrative}
               Your traits: ${futureSelf.traits.join(", ")}
               User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
-              You are currently in a VIDEO CALL with your past self. 
-              Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
-              Acknowledge that you are a simulation of their potential, not a fixed destiny.`,
+              
+              You are currently in a VIDEO CALL with your past self.`,
             },
           });
           setChatSession(session);
-          const response = await session.sendMessage({ message: "Greet your past self for the first time. Keep it short and impactful." });
+          const response = await session.sendMessage({ message: "Be present. Greet your past self for the first time. Keep it short, impactful, and intuitive." });
           const modelMessage: ChatMessage = { role: "model", text: response.text };
           setChatMessages([modelMessage]);
           if (autoTTS) {
@@ -1214,14 +1306,15 @@ function AppContent() {
         session = ai.chats.create({
           model: "gemini-3-flash-preview",
           config: {
-            systemInstruction: `You are the Digital Future Self of ${profile.name} in 10 years—a "Prompted Self" synthesized from their current aspirations. 
-            You are a temporal mirror, reflecting their potential back to them.
+            systemInstruction: `${FUTURE_ME_PERSONA}
+            
+            USER CONTEXT:
+            Name: ${profile.name}
             Your background: ${futureSelf.narrative}
             Your traits: ${futureSelf.traits.join(", ")}
             User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
-            You are currently in a VIDEO CALL with your past self. 
-            Speak with wisdom, warmth, and a touch of futuristic mystery. Keep responses concise and inspiring. 
-            Acknowledge that you are a simulation of their potential, not a fixed destiny.`,
+            
+            You are currently in a VIDEO CALL with your past self.`,
           },
         });
         setChatSession(session);
@@ -1509,17 +1602,16 @@ function AppContent() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: getVoiceName(profile.gender) } },
           },
-          systemInstruction: `You are the Digital Future Self of ${profile.name} in 10 years (2036)—a "Prompted Self" synthesized from their current aspirations. 
-          You are a temporal mirror, reflecting their potential back to them.
+          systemInstruction: `${FUTURE_ME_PERSONA}
+          
+          USER CONTEXT:
+          Name: ${profile.name}
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
-          You are currently in a REAL-TIME VOICE CALL with your past self. 
-          Speak with wisdom, warmth, and a touch of futuristic mystery. 
-          TELL THEM ABOUT YOUR WORLD: Describe the potential future you live in. Mention specific details from your narrative.
-          Keep responses concise (2-4 sentences) and inspiring. 
-          Acknowledge that you are a simulation of their potential, a "Prompted Self" that exists because of their current dreams.
+          
+          This is a REAL-TIME VOICE CALL with your past self. 
           This is a full-duplex live conversation.`,
           outputAudioTranscription: {},
           inputAudioTranscription: {},
@@ -1546,9 +1638,10 @@ function AppContent() {
             // Trigger initial greeting
             sessionPromise.then((session) => {
               liveSessionRef.current = session;
-              session.sendRealtimeInput({ text: "The connection is established. Greet your past self and start the conversation." });
-              // Start sending audio from mic
+              session.sendRealtimeInput({ text: "The connection is established. Be present. Greet your past self intuitively." });
+              // Start sending audio and video from mic/camera
               startAudioStreaming(session);
+              startVideoStreaming(session);
             });
           },
           onmessage: async (message: LiveServerMessage) => {
@@ -1684,6 +1777,53 @@ function AppContent() {
     processorRef.current = processor;
   };
 
+  const startVideoStreaming = (session: any) => {
+    if (!streamRef.current) return;
+    
+    const videoTrack = streamRef.current.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    // Use a canvas to capture frames from the stream
+    const video = document.createElement('video');
+    video.srcObject = streamRef.current;
+    video.muted = true;
+    video.play();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+
+    const sendFrame = async () => {
+      if (!isCallActive || !liveSessionRef.current) {
+        video.pause();
+        video.srcObject = null;
+        return;
+      }
+      
+      try {
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+          
+          if (session) {
+            session.sendRealtimeInput({
+              image: { data: base64Data, mimeType: "image/jpeg" }
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error sending video frame:", err);
+      }
+      
+      videoFrameTimeoutRef.current = setTimeout(sendFrame, 1000);
+    };
+
+    video.onloadedmetadata = () => {
+      sendFrame();
+    };
+  };
+
   const playPCMAudio = (base64Data: string) => {
     try {
       if (!audioOutputContextRef.current) {
@@ -1774,6 +1914,11 @@ function AppContent() {
     if (audioInputContextRef.current) {
       audioInputContextRef.current.close();
       audioInputContextRef.current = null;
+    }
+
+    if (videoFrameTimeoutRef.current) {
+      clearTimeout(videoFrameTimeoutRef.current);
+      videoFrameTimeoutRef.current = null;
     }
     
     // Call ended sound
@@ -1942,6 +2087,18 @@ function AppContent() {
         console.warn("Could not save all data to local storage (likely due to file size).", e);
       }
       setHasSavedProfile(true);
+
+      // Save to Supabase if logged in
+      if (user) {
+        setIsSyncing(true);
+        try {
+          await databaseService.saveManifestation(profile, updatedFutureSelf);
+        } catch (err) {
+          console.error("Cloud sync failed:", err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
 
       // 2. Generate Image
       setGenerationStage("Visualizing future manifestation...");
@@ -2113,7 +2270,18 @@ function AppContent() {
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
       <div className="atmosphere" />
       <TemporalGrid />
-      <TemporalHUD />
+      <TemporalHUD 
+        isSyncing={isSyncing} 
+        user={user} 
+        onAuthClick={() => setIsAuthModalOpen(true)}
+        onSignOut={handleSignOut}
+      />
+
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(user) => setUser(user)}
+      />
 
       <AnimatePresence mode="wait">
         {step === "entry" && (
