@@ -544,6 +544,28 @@ const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeak
 
 // --- Sub-components for stability ---
 
+const VoiceVisualizer = ({ isSpeaking, volume }: { isSpeaking: boolean, volume: number }) => {
+  return (
+    <div className="flex items-center justify-center gap-1.5 h-12">
+      {[...Array(5)].map((_, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            height: isSpeaking ? [12, 12 + (volume * 40 * (1 - Math.abs(i - 2) * 0.2)), 12] : 4,
+            opacity: isSpeaking ? [0.4, 1, 0.4] : 0.2
+          }}
+          transition={{
+            duration: 0.2,
+            repeat: Infinity,
+            delay: i * 0.05
+          }}
+          className="w-1 bg-white rounded-full"
+        />
+      ))}
+    </div>
+  );
+};
+
 const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { videoUrl: string | null, imageUrl: string | null, isSpeaking: boolean, outputVolume: number }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -1495,7 +1517,7 @@ function AppContent() {
       Return JSON: { "task": "the task description", "type": "reflection" }`;
       
       const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [{ parts: [{ text: prompt }] }]
       });
       const text = result.text;
@@ -2277,6 +2299,7 @@ function AppContent() {
         }
 
         let imageFound = false;
+        let quotaExceeded = false;
         try {
           const imageResponse = await generateWithRetry(imageParts, "main avatar");
 
@@ -2301,19 +2324,45 @@ function AppContent() {
         } catch (err: any) {
           console.error("Main image generation failed, using fallback:", err);
           
-          let errorMessage = "Temporal visualization failed.";
           if (isQuotaExceeded(err)) {
-            errorMessage = "Temporal Quota Exceeded: The manifestation energy is low. Using a symbolic fallback. Consider selecting a paid API key for high-fidelity manifestation.";
+            quotaExceeded = true;
+            setCallError(
+              <div className="flex flex-col items-center gap-6 text-center p-8 glass-card max-w-md mx-auto border-red-500/20">
+                <div className="relative">
+                  <CloudOff className="w-12 h-12 text-red-500/20" />
+                  <AlertCircle className="absolute -top-1 -right-1 w-5 h-5 text-red-500 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-serif italic text-glow">Temporal Quota Exceeded</h3>
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    The manifestation energy for high-fidelity visualization is currently depleted. 
+                    We are using a symbolic fallback to maintain the connection.
+                  </p>
+                </div>
+                <div className="flex flex-col w-full gap-2">
+                  <button 
+                    onClick={() => window.aistudio?.openSelectKey()}
+                    className="w-full py-3 bg-white text-black rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-[1.02] transition-all"
+                  >
+                    Select Paid API Key
+                  </button>
+                  <button 
+                    onClick={() => setCallError(null)}
+                    className="w-full py-3 bg-white/5 border border-white/10 text-white/60 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
+                  >
+                    Continue with Fallback
+                  </button>
+                </div>
+              </div>
+            );
+          } else {
+            setCallError("Temporal visualization failed. Using symbolic fallback.");
+            setTimeout(() => setCallError(null), 5000);
           }
-          
-          setCallError(errorMessage);
           
           const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + "future")}/1024/1024`;
           setFutureSelf((prev) => prev ? { ...prev, imageUrl: fallbackUrl } : null);
-          imageFound = true; // Mark as found so we don't throw below
-          
-          // Clear the error after a few seconds so it doesn't block the UI
-          setTimeout(() => setCallError(null), 8000);
+          imageFound = true; 
         }
 
         if (!imageFound) {
@@ -2321,7 +2370,6 @@ function AppContent() {
         }
 
         // 3. Generate Images for other timeline stages
-        let quotaExceeded = false;
         for (let i = 0; i < data.timelineStages.length; i++) {
           const stage = data.timelineStages[i];
           
@@ -2738,54 +2786,29 @@ function AppContent() {
               </div>
             ) : (
               <>
-                <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
-                  {/* Future Self Side (Main Focus) */}
-                  <div className="relative flex-1 h-full overflow-hidden bg-black flex items-center justify-center order-1 md:order-2">
-                    <FutureVideo 
-                      videoUrl={futureSelf?.videoUrl || null} 
-                      imageUrl={futureSelf?.imageUrl || null}
-                      isSpeaking={isSpeaking} 
-                      outputVolume={outputVolume} 
-                    />
-                    {!futureSelf?.videoUrl && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-sm z-10 p-8 text-center">
-                        {videoGenerationError ? (
-                          <>
-                            <CloudOff className="w-6 h-6 text-white/20" />
-                            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 leading-relaxed">
-                              {videoGenerationError}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-6 h-6 text-white/40 animate-spin" />
-                            <p className="text-[8px] font-mono uppercase tracking-[0.5em] text-white/40">Manifesting Video...</p>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <div className="absolute top-6 right-6 md:top-8 md:right-8 z-20 space-y-1 text-right">
-                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Future Reflection</div>
-                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">Horizon: {profile.futureChoice}</div>
-                    </div>
-                  </div>
-
-                  {/* User Side (PiP on Mobile, Split on Desktop) */}
-                  <div className={cn(
-                    "transition-all duration-700 overflow-hidden z-40",
-                    cameraMode === 'pip' ? "fixed bottom-6 right-6 w-32 h-48 rounded-2xl border border-white/20 shadow-2xl" : "md:relative md:bottom-auto md:right-auto md:w-auto md:h-full md:flex-1 md:rounded-none md:border-0 md:border-r md:border-white/5 md:shadow-none",
-                    "order-2 md:order-1"
-                  )}>
+                <div className="absolute inset-0 w-full h-full">
+                  {/* User Side (Full Screen) */}
+                  <div className="absolute inset-0 w-full h-full z-10">
                     <CameraPreview 
                       stream={userStream} 
                       isCameraOn={isCameraOn}
                       passion={profile.passion}
-                      mode={cameraMode} 
-                      onModeChange={setCameraMode} 
+                      mode="debug" // Keep AR elements visible
+                      onModeChange={() => {}} 
                     />
                     <div className="absolute top-3 left-3 md:top-8 md:left-8 z-20 space-y-1 pointer-events-none">
                       <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Past Identity</div>
                       <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">{profile.name}</div>
+                    </div>
+                  </div>
+
+                  {/* Voice Interface Overlay */}
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+                    <div className="mt-auto mb-64 flex flex-col items-center gap-4">
+                      <VoiceVisualizer isSpeaking={isSpeaking} volume={outputVolume} />
+                      <div className="text-[8px] font-mono uppercase tracking-[0.5em] text-white/40">
+                        {isSpeaking ? "Future Self Speaking" : "Listening..."}
+                      </div>
                     </div>
                   </div>
                 </div>
