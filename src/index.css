@@ -20,6 +20,21 @@ body {
   color: #fff;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  /* Mobile optimizations */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  text-rendering: optimizeLegibility;
+}
+
+/* Prevent zooming on inputs in mobile Safari */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+@media (min-width: 768px) {
+  input, textarea, select {
+    font-size: inherit !important;
+  }
 }
 
 .mirror {
@@ -69,6 +84,7 @@ body {
 .glass-card {
   background: var(--glass-surface);
   backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   border: 1px solid var(--glass-border);
   border-radius: 24px;
 }

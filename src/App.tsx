@@ -188,7 +188,7 @@ const PhilosophyModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
             initial={{ scale: 0.9, y: 40, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.9, y: 40, opacity: 0 }}
-            className="w-full max-w-2xl glass-card p-12 md:p-16 relative overflow-hidden border border-white/20 shadow-[0_0_100px_rgba(255,255,255,0.1)]"
+            className="w-full max-w-2xl glass-card p-12 md:p-16 relative overflow-y-auto max-h-[90svh] border border-white/20 shadow-[0_0_100px_rgba(255,255,255,0.1)] scrollbar-hide"
           >
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
             
@@ -417,7 +417,7 @@ const TemporalHUD = ({ isSyncing, user, onAuthClick, onSignOut }: { isSyncing: b
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
           >
             <span className="text-[10px] font-mono uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">
-              {user.email?.split('@')[0]}
+              {user.is_anonymous ? 'Guest' : user.email?.split('@')[0]}
             </span>
             <LogOut className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
           </button>
@@ -688,6 +688,10 @@ function AppContent() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [rechargeTask, setRechargeTask] = useState<{ task: string; type: string } | null>(null);
+  const [isGeneratingRecharge, setIsGeneratingRecharge] = useState(false);
+  const [rechargeInput, setRechargeInput] = useState("");
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -1077,9 +1081,7 @@ function AppContent() {
         ? 'singing on a grand stage with a microphone, expressing deep emotion' 
         : 'living their best life, interacting with their environment';
 
-      const videoPrompt = `A cinematic video of ${futureSelf.visualDescription}. 
-        The person is actively ${actionPrompt}. 
-        High quality, detailed, ethereal lighting, cinematic camera movement.`;
+      const videoPrompt = `Cinematic video: ${futureSelf.visualDescription}, ${actionPrompt}. Ethereal lighting, high quality.`;
 
       let operation = await ai.models.generateVideos({
         model: 'veo-3.1-lite-generate-preview',
@@ -1474,6 +1476,46 @@ function AppContent() {
     recognition.start();
   };
 
+  const generateRechargeTask = async () => {
+    setIsGeneratingRecharge(true);
+    setCallError(null);
+    try {
+      const ai = getAI();
+      const prompt = `The user ${profile.name} is out of "temporal tokens" to talk to their future self.
+      Generate a unique, short, and deep reflection task (one question or one small action) that will help them "re-align" with their future.
+      The task should be related to their passion: ${profile.passion}.
+      Return JSON: { "task": "the task description", "type": "reflection" }`;
+      
+      const result = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{ parts: [{ text: prompt }] }]
+      });
+      const text = result.text;
+      const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const data = JSON.parse(jsonStr);
+      setRechargeTask(data);
+      setStep("recharge");
+    } catch (e) {
+      console.error("Failed to generate recharge task:", e);
+      setRechargeTask({ task: "Close your eyes and visualize one small win you'll achieve tomorrow. Describe it.", type: "reflection" });
+      setStep("recharge");
+    } finally {
+      setIsGeneratingRecharge(false);
+    }
+  };
+
+  const completeRecharge = () => {
+    if (!rechargeInput.trim()) return;
+    setLives(prev => {
+      const next = prev + 1;
+      localStorage.setItem("explow_lives", next.toString());
+      return next;
+    });
+    setRechargeInput("");
+    setRechargeTask(null);
+    setStep("result");
+  };
+
   const startCall = async () => {
     if (isCallActive) return;
     
@@ -1495,15 +1537,34 @@ function AppContent() {
             <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/40">Recharge Status</p>
             <p className="text-xs font-mono text-white/80">Next Token Available in ~24h</p>
           </div>
-          <button 
-            onClick={() => {
-              setStep("result");
-              setCallError(null);
-            }}
-            className="w-full py-4 bg-white text-black rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:scale-[1.02] transition-all"
-          >
-            Return to Manifestation
-          </button>
+          <div className="w-full space-y-3">
+            <button 
+              onClick={generateRechargeTask}
+              disabled={isGeneratingRecharge}
+              className="w-full py-4 bg-white text-black rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
+            >
+              {isGeneratingRecharge ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Aligning...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  Temporal Alignment
+                </>
+              )}
+            </button>
+            <button 
+              onClick={() => {
+                setStep("result");
+                setCallError(null);
+              }}
+              className="w-full py-4 bg-white/5 border border-white/10 text-white/60 rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
+            >
+              Return to Manifestation
+            </button>
+          </div>
         </div>
       );
       setStep("video-call");
@@ -1559,7 +1620,23 @@ function AppContent() {
     const ringInterval = setInterval(playRing, 2000);
     playRing();
 
+    // Ensure AudioContext is resumed
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+
     try {
+      // Check for API Key if using Live API (paid model)
+      if (window.aistudio?.hasSelectedApiKey) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey && !process.env.GEMINI_API_KEY) {
+          clearInterval(ringInterval);
+          await openKeySelection();
+          // After returning from key selection, we should restart the call process
+          // but for now we'll just proceed and hope the key is injected
+        }
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Media devices API not supported in this browser.");
       }
@@ -1595,6 +1672,12 @@ function AppContent() {
 
       console.log("Initializing Live API connection...");
       const ai = getAI();
+      
+      if (!ai.live) {
+        throw new Error("Live API not supported by this SDK version or configuration. Please ensure you are using a compatible model and API key.");
+      }
+
+      // Use a more robust connection approach
       const sessionPromise = ai.live.connect({
         model: "gemini-3.1-flash-live-preview",
         config: {
@@ -1696,9 +1779,14 @@ function AppContent() {
             console.log("Live API connection closed.");
             endCall();
           },
-          onerror: (err) => {
+          onerror: (err: any) => {
             console.error("Live API Error:", err);
-            setCallError("AI Connection Error. Please try again.");
+            // If it's a network error, it might be due to API key or region
+            if (err.message?.includes("Network error") || err.message?.includes("failed to connect")) {
+              setCallError("Network Error: Unable to connect to the temporal bridge. Please check your internet or try selecting a paid API key.");
+            } else {
+              setCallError("AI Connection Error. Please try again.");
+            }
           },
         }
       });
@@ -2267,7 +2355,7 @@ function AppContent() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
+    <div className="relative min-h-[100svh] w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <div className="atmosphere" />
       <TemporalGrid />
       <TemporalHUD 
@@ -2299,7 +2387,7 @@ function AppContent() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-4"
                 >
-                  <h1 className="text-6xl md:text-8xl font-sans font-light tracking-tighter leading-none">
+                  <h1 className="text-5xl md:text-8xl font-sans font-light tracking-tighter leading-none">
                     Temporal <br />
                     <span className="text-white/30 italic">Reflection</span>
                   </h1>
@@ -2349,6 +2437,46 @@ function AppContent() {
                 Initiate Sync
               </button>
 
+              {!user && (
+                <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                  <div className="flex items-center gap-3 w-full">
+                    <button
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="flex-1 py-3 bg-white/10 border border-white/20 rounded-full text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/20 transition-all"
+                    >
+                      Login / Sign Up
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setAuthError(null);
+                        try {
+                          const { data, error } = await supabase.auth.signInAnonymously();
+                          if (error) throw error;
+                          if (data.user) setUser(data.user);
+                        } catch (err: any) {
+                          console.error("Guest login failed:", err);
+                          setAuthError(err.message?.includes("disabled") 
+                            ? "Guest access is disabled in Supabase settings." 
+                            : "Guest login failed. Please try again.");
+                        }
+                      }}
+                      className="flex-1 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                      Guest Access
+                    </button>
+                  </div>
+                  {authError && (
+                    <motion.p 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-[10px] font-mono text-red-400 uppercase tracking-widest"
+                    >
+                      {authError}
+                    </motion.p>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={handleShare}
                 className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
@@ -2369,7 +2497,7 @@ function AppContent() {
             className="w-full max-w-4xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Temporal Horizon</h2>
+              <h2 className="text-3xl md:text-6xl font-sans font-light tracking-tighter">Temporal Horizon</h2>
               <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Select the depth of your reflection</p>
             </div>
 
@@ -2388,7 +2516,7 @@ function AppContent() {
                     setProfile(p => ({ ...p, futureChoice: choice.id as any }));
                     setStep("choose-response");
                   }}
-                  className="glass-card p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
+                  className="glass-card p-8 md:p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
                   <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
                   <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
@@ -2407,13 +2535,13 @@ function AppContent() {
             className="w-full max-w-2xl space-y-16 relative z-10"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Interface</h2>
+              <h2 className="text-3xl md:text-6xl font-sans font-light tracking-tighter">Interface</h2>
               <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Communication Mode</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {[
-                { id: "voice", label: "Voice", sub: "Real-time audio" },
+                { id: "voice", label: "Video", sub: "Real-time audio & visual" },
                 { id: "text", label: "Text", sub: "Neural transmission" }
               ].map((choice, i) => (
                 <motion.button
@@ -2423,9 +2551,10 @@ function AppContent() {
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
                     setProfile(p => ({ ...p, responseMode: choice.id as any }));
-                    setStep("take-selfie");
+                    setStep("transformation");
+                    generateFutureSelf();
                   }}
-                  className="glass-card p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
+                  className="glass-card p-8 md:p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
                   <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
                   <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
@@ -2435,79 +2564,6 @@ function AppContent() {
           </motion.div>
         )}
 
-        {step === "take-selfie" && (
-          <motion.div
-            key="take-selfie"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-2xl text-center space-y-12 relative z-10"
-          >
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-6xl font-sans font-light tracking-tighter">Temporal Mirror</h2>
-              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Align your presence</p>
-            </div>
-
-            <div className="relative aspect-video w-full max-w-xl mx-auto rounded-3xl overflow-hidden border border-white/10 glass-card">
-              {stream ? (
-                <>
-                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover mirror" />
-                  <div className="absolute inset-0 pointer-events-none border border-white/20 rounded-3xl" />
-                  {countdown !== null && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-30">
-                      <motion.span
-                        key={countdown}
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="text-9xl font-sans font-light text-white"
-                      >
-                        {countdown}
-                      </motion.span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-8">
-                  <Camera className="w-12 h-12 text-white/10" />
-                  <button
-                    onClick={startCamera}
-                    className="px-10 py-5 bg-white text-black rounded-full hover:scale-105 active:scale-95 transition-all text-xs font-bold uppercase tracking-widest"
-                  >
-                    Enable Mirror
-                  </button>
-                </div>
-              )}
-              <canvas ref={canvasRef} className="hidden" />
-            </div>
-
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-              {stream ? (
-                <>
-                  <button
-                    onClick={startCountdown}
-                    disabled={countdown !== null}
-                    className="minimal-reflection px-12 py-6 bg-white text-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all text-sm font-bold uppercase tracking-[0.4em] disabled:opacity-50"
-                  >
-                    Capture
-                  </button>
-                  <button
-                    onClick={skipSelfie}
-                    className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[10px]"
-                  >
-                    Skip Biometrics
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={skipSelfie}
-                  className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[10px]"
-                >
-                  Proceed without Mirror
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
 
         {step === "transformation" && (
           <motion.div
@@ -2659,7 +2715,7 @@ function AppContent() {
                   {/* User Side (PiP on Mobile, Split on Desktop) */}
                   <div className={cn(
                     "transition-all duration-700 overflow-hidden z-40",
-                    "fixed bottom-32 right-6 w-32 h-48 rounded-2xl border border-white/20 shadow-2xl", // Mobile PiP
+                    "fixed bottom-6 right-6 w-28 h-40 rounded-2xl border border-white/20 shadow-2xl", // Mobile PiP
                     "md:relative md:bottom-auto md:right-auto md:w-auto md:h-full md:flex-1 md:rounded-none md:border-0 md:border-r md:border-white/5 md:shadow-none", // Desktop Split
                     "order-2 md:order-1"
                   )}>
@@ -2672,7 +2728,7 @@ function AppContent() {
                 </div>
 
                 {/* Transcription Overlay */}
-                <div className="absolute bottom-32 md:bottom-40 left-0 right-0 px-8 md:px-12 flex flex-col items-center pointer-events-none z-20">
+                <div className="absolute bottom-52 md:bottom-40 left-0 right-0 px-8 md:px-12 flex flex-col items-center pointer-events-none z-20">
                   <AnimatePresence mode="wait">
                     {chatMessages.length > 0 && (
                       <motion.div
@@ -2693,8 +2749,8 @@ function AppContent() {
                   </AnimatePresence>
                 </div>
 
-                {/* Controls */}
-                <div className="absolute bottom-8 md:bottom-12 left-0 right-0 flex flex-col items-center gap-6 z-30 px-6">
+                {/* Controls - Moved to top as requested */}
+                <div className="absolute top-8 md:top-12 left-0 right-0 flex flex-col items-center gap-6 z-[110] px-6 pt-[env(safe-area-inset-top)]">
                   <div className="flex items-center gap-4 md:gap-8 bg-black/60 backdrop-blur-2xl border border-white/10 p-2 md:p-3 rounded-full shadow-2xl">
                     <button
                       onClick={toggleMute}
@@ -2731,7 +2787,7 @@ function AppContent() {
                         value={userResponse}
                         onChange={(e) => setUserResponse(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleNextCallStep(userResponse)}
-                        placeholder="Type message..."
+                        placeholder="Chat with your future self..."
                         className="flex-1 bg-transparent border-none px-4 py-2 focus:outline-none text-sm"
                       />
                       <button
@@ -2749,6 +2805,54 @@ function AppContent() {
                 </div>
               </>
             )}
+          </motion.div>
+        )}
+
+        {step === "recharge" && rechargeTask && (
+          <motion.div
+            key="recharge"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-md text-center space-y-12 relative z-10"
+          >
+            <div className="space-y-8">
+              <div className="w-24 h-24 bg-white/5 rounded-full mx-auto flex items-center justify-center">
+                <Zap className="w-8 h-8 text-white animate-pulse" />
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-sans font-light tracking-tighter">Temporal Alignment</h2>
+                <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Manifesting Energy</p>
+              </div>
+            </div>
+
+            <div className="glass-card p-8 space-y-6 text-left border border-white/20">
+              <p className="text-sm font-light leading-relaxed text-white/80 italic">
+                "{rechargeTask.task}"
+              </p>
+              <textarea
+                value={rechargeInput}
+                onChange={(e) => setRechargeInput(e.target.value)}
+                placeholder="Share your reflection..."
+                className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-white/30 transition-all resize-none"
+              />
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={completeRecharge}
+                disabled={!rechargeInput.trim()}
+                className="minimal-reflection w-full py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em] disabled:opacity-50"
+              >
+                Complete Alignment
+              </button>
+              <button
+                onClick={() => setStep("result")}
+                className="text-white/30 hover:text-white transition-colors font-mono uppercase tracking-[0.4em] text-[10px]"
+              >
+                Cancel
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -2787,7 +2891,7 @@ function AppContent() {
             className="w-full max-w-5xl space-y-24 relative z-10 py-24"
           >
             <div className="text-center space-y-6">
-              <h1 className="text-6xl md:text-8xl font-sans font-light tracking-tighter">Future Reflection</h1>
+              <h1 className="text-5xl md:text-8xl font-sans font-light tracking-tighter">Future Reflection</h1>
               <p className="text-xs font-mono uppercase tracking-[0.6em] text-white/20">Temporal Node: {profile.name}</p>
             </div>
 
@@ -3004,7 +3108,7 @@ function AppContent() {
           </button>
           <button 
             onClick={clearSavedData}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-full text-[8px] md:text-[10px] font-mono uppercase tracking-[0.3em] text-red-500/40 hover:text-red-500 transition-all group"
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full text-[8px] md:text-[10px] font-mono uppercase tracking-[0.3em] text-red-500 hover:text-red-400 transition-all group"
           >
             <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
             Reset Identity
