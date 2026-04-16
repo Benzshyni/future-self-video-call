@@ -62,7 +62,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       onSuccess(data.user);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Guest login failed. Ensure Anonymous Auth is enabled in Supabase.');
+      console.warn("Supabase guest login failed, falling back to local guest mode:", err);
+      // Fallback to local guest mode
+      onSuccess({
+        id: 'local-guest-' + Math.random().toString(36).substr(2, 9),
+        email: 'guest@local.manifest',
+        is_anonymous: true,
+        user_metadata: { full_name: 'Guest Traveler' }
+      });
+      onClose();
     } finally {
       setGuestLoading(false);
     }
