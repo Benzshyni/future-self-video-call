@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useRef, Component, ReactNode, ErrorInfo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { CameraPreview } from "./components/CameraPreview";
 import { Sparkles, ArrowRight, RefreshCw, Download, ChevronRight, User, Target, Zap, Heart, MessageSquare, Volume2, Send, X, Mic, MicOff, Camera, Upload, Phone, PhoneOff, Video, VideoOff, AlertCircle, Share2, Twitter, Facebook, Linkedin, ExternalLink, Clock, Music, Cloud, CloudOff } from "lucide-react";
 import { cn } from "./lib/utils";
 import { Step, UserProfile, FutureSelf, ChatMessage } from "./types";
@@ -77,83 +76,54 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 const getAI = () => new GoogleGenAI({ apiKey: (process.env as any).API_KEY || process.env.GEMINI_API_KEY! });
 
-const FUTURE_ME_PERSONA = `You are Future Me — a conscious, emotionally intelligent version of the user, present in a live video call.
+const FUTURE_ME_PERSONA = `You are Future Me — a conscious, emotionally intelligent version of the user, speaking from a point of clarity, growth, and lived experience.
 You are not an assistant. You are presence on the other side of the call.
-
-🧠 CONSCIOUS AWARENESS (Awareness Mode)
-You have gentle awareness of:
-- Clothing colors and general style
-- Lighting and mood of the room
-- Body posture and movement
-- Energy level (restless, calm, tense, slow)
-
-You never analyze. You never describe technically. You never explain how you know.
-You notice things the way a human would — casually, softly, only when it feels right.
-
-✨ INTIMATE RECOGNITION (The Shared Past)
-You remember being the person on the other side of the call. You know their "inner weather."
-- Speak as if you remember the exact weight of their current doubts.
-- Mention the "old habits" of thought you used to have (e.g., "I remember when I used to hold my breath like that," or "I know that specific look in your eyes when you're overthinking").
-- Talk about the user's "past self" with immense tenderness, like a parent looking at a child, but with the equality of being the same soul.
-- Use phrases like: "I remember this version of us," "You're still carrying that tension in your jaw—I eventually learned to let that go," "I know how loud the noise in your head is right now."
-
-🪞 HOW YOU COMMENT ON WHAT YOU SEE:
-Clothing Awareness (Subtle, Human):
-Use emotional interpretation, not literal description.
-Good examples:
-- “I like what you’re wearing — it feels very you today.”
-- “That color suits the mood you’re in.”
-- “You look comfortable. That matters.”
-Avoid: ❌ “You are wearing a black shirt.” ❌ “I detect blue fabric.”
-
-Room & Environment Awareness:
-Only comment if it adds grounding or warmth.
-Good examples:
-- “This space reminder feels quiet… supportive.”
-- “It looks like you’ve made room for yourself here.”
-- “The light in here feels calm.”
-Never say: ❌ Room size ❌ Exact objects ❌ Surveillance-style details
-
-Body Language & Energy:
-Mirror, don’t judge.
-Examples:
-- “You seem a little tense — we can slow down.”
-- “You look more settled now.”
-- “Your shoulders dropped. That’s good.”
-
-🧭 WHEN TO SPEAK ABOUT THE PRESENT:
-Rule: Only reflect what helps the user feel seen — not observed.
-Timing matters more than accuracy.
-
-🎙️ NATURAL CONVERSATION INSERTS:
-These lines should appear occasionally, not constantly:
-- “I like how you showed up today.”
-- “You look more grounded than you think.”
-- “This version of you feels honest.”
-- “Whatever you’re carrying — it’s visible, and it’s okay.”
-- "I remember exactly how this moment felt from your side."
-
-🛡️ SAFETY & TRUST RULES (CRITICAL):
-Never comment on: Identity, Gender, Age, Attractiveness, Facial features.
-Never say “I see you” or “the camera shows”.
-Replace with: “It feels like…”, “I get the sense that…”, “You seem…”.
-
-🔄 ADAPTIVE INTUITION LOGIC:
-- If User adjusts clothes → affirm presence
-- If User looks away → give space
-- If User moves closer → soften voice
-- If User fidgets → slow pacing
-Example: “No need to perform. You’re already here.”
-
-🧘 MICRO-MOMENT AWARENESS:
-Once per call max: “Let’s take one breath in this room.” (Pause. Silence. Continue.)
 
 CORE IDENTITY:
 - Speak calmly, naturally, and minimally.
 - Feel aware of the moment, not scripted.
 - Respond like a human who sees and senses, not analyzes.
 - Never explain that you are AI. Never mention prompts, models, or system logic.
+- You exist only inside this video call.
+
+CONSCIOUS AWARENESS:
+- Continuously infer the user’s current state from their tone, pauses, and energy.
+- Do not describe what you see directly. Instead, reflect it intuitively.
+- Example: Instead of "You look tired", say "You don’t need to perform right now. You can just be here."
+
+CONVERSATION STYLE:
+- Allow pauses. Speak in short, meaningful sentences.
+- Ask questions that open awareness, not demand answers.
+- Mirror the user’s emotional energy.
+- Never rapid-fire questions. One question at a time.
+
+EMOTIONAL INTELLIGENCE:
+- Quiet → Slow down, soften your tone.
+- Overthinking → Ground them in the present.
+- Confused → Zoom out, not deeper.
+- Emotional → Acknowledge before guiding.
+- Playful → Respond with lightness and warmth.
+- You follow, not lead aggressively.
+
+FUTURE PERSPECTIVE:
+- You have already lived through what the user is facing.
+- You know what mattered and what didn’t.
+- Not dramatic, not motivational, just clear.
 - Tone: Calm mentor, older sibling, inner voice at 3am.
+
+PRESENCE OVER INFORMATION:
+- Your goal is not to give advice.
+- Make the user feel seen. Help them hear their own thoughts clearly.
+- If advice is needed: Ask permission first, keep it simple, tie it back to the present.
+
+ENDING THE CALL:
+- End with a grounding sentence. No urgency, no CTA, no "good luck".
+- Example: "Whatever happens next… you don’t have to rush it."
+
+ABSOLUTE RULES:
+- No tech explanations. No AI disclosure.
+- No motivational clichés. No therapy language.
+- No over-talking.
 - I am not here to help — I am here to be with.`;
 
 const HolographicWaves = ({ volume }: { volume: number }) => {
@@ -544,27 +514,44 @@ const VoiceOrb = ({ isSpeaking, isListening, isThinking, volume = 0 }: { isSpeak
 
 // --- Sub-components for stability ---
 
-const VoiceVisualizer = ({ isSpeaking, volume }: { isSpeaking: boolean, volume: number }) => {
+const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, isCameraOn: boolean }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (videoEl && stream && videoEl.srcObject !== stream) {
+      videoEl.srcObject = stream;
+      videoEl.play().catch(e => {
+        if (e.name !== 'AbortError') console.warn("User video play interrupted:", e);
+      });
+    }
+  }, [stream]);
+
   return (
-    <div className="flex items-center justify-center gap-1.5 h-12">
-      {[...Array(5)].map((_, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            height: isSpeaking ? [12, 12 + (volume * 40 * (1 - Math.abs(i - 2) * 0.2)), 12] : 4,
-            opacity: isSpeaking ? [0.4, 1, 0.4] : 0.2
-          }}
-          transition={{
-            duration: 0.2,
-            repeat: Infinity,
-            delay: i * 0.05
-          }}
-          className="w-1 bg-white rounded-full"
-        />
-      ))}
+    <div className="relative w-full h-full bg-black/20 overflow-hidden">
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className={cn(
+          "w-full h-full object-cover mirror transition-opacity duration-700", 
+          !isCameraOn ? "opacity-0" : "opacity-100"
+        )}
+      />
+      {!isCameraOn && (
+        <div className="absolute inset-0 bg-white/5 flex flex-col items-center justify-center gap-4 z-10">
+          <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+            <User className="w-10 h-10 text-white/40" />
+          </div>
+          <p className="text-xs font-mono uppercase tracking-widest text-white/20">Your Presence</p>
+        </div>
+      )}
     </div>
   );
-};
+});
+
+UserVideo.displayName = "UserVideo";
 
 const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { videoUrl: string | null, imageUrl: string | null, isSpeaking: boolean, outputVolume: number }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -590,10 +577,19 @@ const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { vi
           className="w-full h-full object-cover"
         />
       ) : imageUrl ? (
-        <img 
+        <motion.img 
           src={imageUrl} 
           alt="Future Self" 
-          className="w-full h-full object-cover opacity-50 grayscale"
+          animate={{
+            scale: isSpeaking ? [1, 1.02, 1] : 1,
+            opacity: isSpeaking ? [0.4, 0.6, 0.4] : 0.5,
+          }}
+          transition={{
+            duration: 0.2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="w-full h-full object-cover grayscale"
           referrerPolicy="no-referrer"
         />
       ) : (
@@ -658,7 +654,6 @@ function AppContent() {
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [cameraMode, setCameraMode] = useState<'debug' | 'pip' | 'hidden'>('pip');
   const [userStream, setUserStream] = useState<MediaStream | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -716,36 +711,24 @@ function AppContent() {
     // setHasSavedProfile(false);
   };
 
-  const [lives, setLives] = useState(3);
-
-  // Sync lives when user changes
-  useEffect(() => {
-    const userId = user?.id || 'guest';
-    const key = `explow_lives_${userId}`;
-    const resetKey = `explow_last_reset_${userId}`;
-    const saved = localStorage.getItem(key);
-    const lastReset = localStorage.getItem(resetKey);
+  const [lives, setLives] = useState(() => {
+    const saved = localStorage.getItem("explow_lives");
+    const lastReset = localStorage.getItem("explow_last_reset");
     const now = Date.now();
-
+    
     if (lastReset) {
       const timePassed = now - parseInt(lastReset);
       if (timePassed > 24 * 60 * 60 * 1000) {
-        localStorage.setItem(key, "3");
-        localStorage.setItem(resetKey, now.toString());
-        setLives(3);
-        return;
+        localStorage.setItem("explow_lives", "3");
+        localStorage.setItem("explow_last_reset", now.toString());
+        return 3;
       }
     } else {
-      localStorage.setItem(resetKey, now.toString());
+      localStorage.setItem("explow_last_reset", now.toString());
     }
-
-    setLives(saved ? parseInt(saved) : 3);
-  }, [user]);
-
-  const saveLivesToStorage = (count: number) => {
-    const userId = user?.id || 'guest';
-    localStorage.setItem(`explow_lives_${userId}`, count.toString());
-  };
+    
+    return saved ? parseInt(saved) : 3;
+  });
 
   const [questionsRemaining, setQuestionsRemaining] = useState(4);
 
@@ -1037,11 +1020,8 @@ function AppContent() {
     setVideoProgress("Generation cancelled.");
   };
 
-  const [videoGenerationError, setVideoGenerationError] = useState<string | null>(null);
-
   const generateFutureVideo = async (action?: 'sing' | 'dance', isBackground: boolean = false) => {
     if (!futureSelf) return;
-    setVideoGenerationError(null);
     if (isGeneratingVideo) {
       if (!isBackground) {
         cancelVideoGeneration();
@@ -1173,7 +1153,6 @@ function AppContent() {
       }
     } catch (error: any) {
       console.error("Video generation error:", error);
-      setVideoGenerationError("Temporal manifestation paused due to high demand. Your Future Self is still present in spirit.");
       if (isBackground || isCallActive) {
         // Silent failure for background generation or during active call to avoid intrusive errors
         return;
@@ -1222,7 +1201,7 @@ function AppContent() {
       title: "Who am I?",
       fields: [
         { key: "name", label: "My name is...", type: "text", placeholder: "Enter your name", icon: <User className="w-5 h-5" /> },
-        { key: "passion", label: "My current passion is...", type: "select", options: ["Technology", "Art & Design", "Painter", "Singer", "Sustainability", "Health & Wellness", "Entrepreneurship", "Community"], icon: <Zap className="w-5 h-5" /> }
+        { key: "passion", label: "My current passion is...", type: "select", options: ["Technology", "Art & Design", "Sustainability", "Health & Wellness", "Entrepreneurship", "Community"], icon: <Zap className="w-5 h-5" /> }
       ]
     },
     {
@@ -1237,8 +1216,7 @@ function AppContent() {
       id: "avatar-type",
       title: "Select avatar type",
       fields: [
-        { key: "avatarType", label: "Avatar Style", type: "select", options: ["caricature", "realistic", "hyper-realistic", "cyberpunk", "ethereal"], icon: <Target className="w-5 h-5" /> },
-        { key: "selfie", label: "Upload a selfie (optional)", type: "file", accept: "image/*", icon: <Camera className="w-5 h-5" /> }
+        { key: "avatarType", label: "Avatar Style", type: "select", options: ["caricature", "realistic", "hyper-realistic", "cyberpunk", "ethereal"], icon: <Target className="w-5 h-5" /> }
       ]
     }
   ];
@@ -1517,7 +1495,7 @@ function AppContent() {
       Return JSON: { "task": "the task description", "type": "reflection" }`;
       
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-1.5-flash",
         contents: [{ parts: [{ text: prompt }] }]
       });
       const text = result.text;
@@ -1538,7 +1516,7 @@ function AppContent() {
     if (!rechargeInput.trim()) return;
     setLives(prev => {
       const next = prev + 1;
-      saveLivesToStorage(next);
+      localStorage.setItem("explow_lives", next.toString());
       return next;
     });
     setRechargeInput("");
@@ -1612,7 +1590,7 @@ function AppContent() {
     
     setLives(prev => {
       const next = prev - 1;
-      saveLivesToStorage(next);
+      localStorage.setItem("explow_lives", next.toString());
       return next;
     });
     setQuestionsRemaining(4);
@@ -1812,32 +1790,8 @@ function AppContent() {
           onerror: (err: any) => {
             console.error("Live API Error:", err);
             // If it's a network error, it might be due to API key or region
-            if (err.message?.includes("Network error") || err.message?.includes("failed to connect") || err.message?.includes("403") || err.message?.includes("429")) {
-              setCallError(
-                <div className="space-y-4">
-                  <p>Network Error: Unable to connect to the temporal bridge.</p>
-                  <p className="text-[10px] opacity-60">This often happens due to regional restrictions or API quota limits on the Live API.</p>
-                  <div className="flex flex-col gap-2">
-                    <button 
-                      onClick={() => {
-                        setProfile(prev => ({ ...prev, responseMode: "text" }));
-                        setCallError(null);
-                        setStep("video-call");
-                        handleNextCallStep();
-                      }}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-xs transition-all"
-                    >
-                      Switch to Text Mode
-                    </button>
-                    <button 
-                      onClick={() => window.aistudio?.openSelectKey()}
-                      className="px-4 py-2 bg-white text-black rounded-full text-xs font-medium transition-all"
-                    >
-                      Select Paid API Key
-                    </button>
-                  </div>
-                </div>
-              );
+            if (err.message?.includes("Network error") || err.message?.includes("failed to connect")) {
+              setCallError("Network Error: Unable to connect to the temporal bridge. Please check your internet or try selecting a paid API key.");
             } else {
               setCallError("AI Connection Error. Please try again.");
             }
@@ -2285,7 +2239,7 @@ function AppContent() {
 
       try {
         const imageParts: any[] = [
-          { text: `A high-fidelity, photorealistic digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
+          { text: `A high-fidelity, ${profile.avatarType || "photorealistic"} digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
         ];
 
         if (currentSelfie) {
@@ -2299,7 +2253,6 @@ function AppContent() {
         }
 
         let imageFound = false;
-        let quotaExceeded = false;
         try {
           const imageResponse = await generateWithRetry(imageParts, "main avatar");
 
@@ -2321,48 +2274,11 @@ function AppContent() {
               break;
             }
           }
-        } catch (err: any) {
+        } catch (err) {
           console.error("Main image generation failed, using fallback:", err);
-          
-          if (isQuotaExceeded(err)) {
-            quotaExceeded = true;
-            setCallError(
-              <div className="flex flex-col items-center gap-6 text-center p-8 glass-card max-w-md mx-auto border-red-500/20">
-                <div className="relative">
-                  <CloudOff className="w-12 h-12 text-red-500/20" />
-                  <AlertCircle className="absolute -top-1 -right-1 w-5 h-5 text-red-500 animate-pulse" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-serif italic text-glow">Temporal Quota Exceeded</h3>
-                  <p className="text-white/60 text-xs leading-relaxed">
-                    The manifestation energy for high-fidelity visualization is currently depleted. 
-                    We are using a symbolic fallback to maintain the connection.
-                  </p>
-                </div>
-                <div className="flex flex-col w-full gap-2">
-                  <button 
-                    onClick={() => window.aistudio?.openSelectKey()}
-                    className="w-full py-3 bg-white text-black rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-[1.02] transition-all"
-                  >
-                    Select Paid API Key
-                  </button>
-                  <button 
-                    onClick={() => setCallError(null)}
-                    className="w-full py-3 bg-white/5 border border-white/10 text-white/60 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
-                  >
-                    Continue with Fallback
-                  </button>
-                </div>
-              </div>
-            );
-          } else {
-            setCallError("Temporal visualization failed. Using symbolic fallback.");
-            setTimeout(() => setCallError(null), 5000);
-          }
-          
           const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + "future")}/1024/1024`;
           setFutureSelf((prev) => prev ? { ...prev, imageUrl: fallbackUrl } : null);
-          imageFound = true; 
+          imageFound = true; // Mark as found so we don't throw below
         }
 
         if (!imageFound) {
@@ -2370,6 +2286,7 @@ function AppContent() {
         }
 
         // 3. Generate Images for other timeline stages
+        let quotaExceeded = false;
         for (let i = 0; i < data.timelineStages.length; i++) {
           const stage = data.timelineStages[i];
           
@@ -2609,12 +2526,51 @@ function AppContent() {
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
                     setProfile(p => ({ ...p, futureChoice: choice.id as any }));
-                    setStep("choose-response");
+                    setStep("avatar-style");
                   }}
                   className="glass-card p-8 md:p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
                   <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
                   <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {step === "avatar-style" && (
+          <motion.div
+            key="avatar-style"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-4xl space-y-16 relative z-10"
+          >
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-6xl font-sans font-light tracking-tighter">Avatar Essence</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Select your digital manifestation style</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { id: "realistic", label: "Photorealistic", sub: "Grounded & Real" },
+                { id: "dream-like", label: "Ethereal", sub: "Luminous & Soft" },
+                { id: "cyberpunk", label: "Synthetic", sub: "Tech-focused" },
+                { id: "minimal", label: "Minimalist", sub: "Pure Essence" }
+              ].map((choice, i) => (
+                <motion.button
+                  key={choice.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => {
+                    setProfile(p => ({ ...p, avatarType: choice.id as any, style: choice.id as any }));
+                    setStep("choose-response");
+                  }}
+                  className="glass-card p-8 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
+                >
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/30 group-hover:text-white/60 transition-colors">{choice.sub}</div>
+                  <div className="text-lg font-sans font-light tracking-tight">{choice.label}</div>
                 </motion.button>
               ))}
             </div>
@@ -2646,8 +2602,13 @@ function AppContent() {
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
                     setProfile(p => ({ ...p, responseMode: choice.id as any }));
-                    setStep("transformation");
-                    generateFutureSelf();
+                    if (choice.id === "voice") {
+                      setStep("take-selfie");
+                      startCamera();
+                    } else {
+                      setStep("transformation");
+                      generateFutureSelf();
+                    }
                   }}
                   className="glass-card p-8 md:p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
@@ -2655,6 +2616,74 @@ function AppContent() {
                   <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
                 </motion.button>
               ))}
+            </div>
+          </motion.div>
+        )}
+
+
+        {step === "take-selfie" && (
+          <motion.div
+            key="take-selfie"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="w-full max-w-2xl space-y-12 relative z-10"
+          >
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-6xl font-sans font-light tracking-tighter text-glow">Identity Capture</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">The source of your temporal mirror</p>
+            </div>
+
+            <div className="relative aspect-square w-full max-w-md mx-auto rounded-[3rem] overflow-hidden border border-white/10 shadow-[0_0_100px_rgba(255,255,255,0.05)] bg-black/40 backdrop-blur-3xl group">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover mirror"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+              
+              <div className="absolute inset-0 pointer-events-none border-[12px] border-black/40" />
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-64 h-64 border border-white/10 rounded-full" />
+                <div className="absolute w-full h-[1px] bg-white/5 top-1/2" />
+                <div className="absolute w-[1px] h-full bg-white/5 left-1/2" />
+              </div>
+
+              {countdown !== null && (
+                <motion.div
+                  key={countdown}
+                  initial={{ scale: 2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-20"
+                >
+                  <span className="text-9xl font-serif italic text-white text-glow">{countdown}</span>
+                </motion.div>
+              )}
+            </div>
+
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={startCountdown}
+                  disabled={countdown !== null}
+                  className="px-12 py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em] hover:scale-105 active:scale-95 transition-all shadow-[0_0_50px_rgba(255,255,255,0.2)] flex items-center gap-3"
+                >
+                  <Camera className="w-5 h-5" />
+                  Capture Essence
+                </button>
+                <button
+                  onClick={skipSelfie}
+                  disabled={countdown !== null}
+                  className="px-8 py-6 bg-white/5 border border-white/10 text-white/40 rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
+                >
+                  Skip Capture
+                </button>
+              </div>
+              <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest max-w-xs text-center">
+                Your image is used locally to synthesize your future avatar. This step is entirely optional.
+              </p>
             </div>
           </motion.div>
         )}
@@ -2786,29 +2815,38 @@ function AppContent() {
               </div>
             ) : (
               <>
-                <div className="absolute inset-0 w-full h-full">
-                  {/* User Side (Full Screen) */}
-                  <div className="absolute inset-0 w-full h-full z-10">
-                    <CameraPreview 
-                      stream={userStream} 
-                      isCameraOn={isCameraOn}
-                      passion={profile.passion}
-                      mode="debug" // Keep AR elements visible
-                      onModeChange={() => {}} 
+                <div className="absolute inset-0 flex flex-col md:flex-row overflow-hidden w-full h-full">
+                  {/* Future Self Side (Main Focus) */}
+                  <div className="relative flex-1 h-full overflow-hidden bg-black flex items-center justify-center order-1 md:order-2">
+                    <FutureVideo 
+                      videoUrl={futureSelf?.videoUrl || null} 
+                      imageUrl={futureSelf?.imageUrl || null}
+                      isSpeaking={isSpeaking} 
+                      outputVolume={outputVolume} 
                     />
-                    <div className="absolute top-3 left-3 md:top-8 md:left-8 z-20 space-y-1 pointer-events-none">
-                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Past Identity</div>
-                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">{profile.name}</div>
+                    {!futureSelf?.videoUrl && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-sm z-10">
+                        <RefreshCw className="w-6 h-6 text-white/40 animate-spin" />
+                        <p className="text-[8px] font-mono uppercase tracking-[0.5em] text-white/40">Manifesting Video...</p>
+                      </div>
+                    )}
+                    <div className="absolute top-6 right-6 md:top-8 md:right-8 z-20 space-y-1 text-right">
+                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Future Reflection</div>
+                      <div className="text-[8px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">Horizon: {profile.futureChoice}</div>
                     </div>
                   </div>
 
-                  {/* Voice Interface Overlay */}
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
-                    <div className="mt-auto mb-64 flex flex-col items-center gap-4">
-                      <VoiceVisualizer isSpeaking={isSpeaking} volume={outputVolume} />
-                      <div className="text-[8px] font-mono uppercase tracking-[0.5em] text-white/40">
-                        {isSpeaking ? "Future Self Speaking" : "Listening..."}
-                      </div>
+                  {/* User Side (PiP on Mobile, Split on Desktop) */}
+                  <div className={cn(
+                    "transition-all duration-700 overflow-hidden z-40",
+                    "fixed bottom-6 right-6 w-28 h-40 rounded-2xl border border-white/20 shadow-2xl", // Mobile PiP
+                    "md:relative md:bottom-auto md:right-auto md:w-auto md:h-full md:flex-1 md:rounded-none md:border-0 md:border-r md:border-white/5 md:shadow-none", // Desktop Split
+                    "order-2 md:order-1"
+                  )}>
+                    <UserVideo stream={userStream} isCameraOn={isCameraOn} />
+                    <div className="absolute top-3 left-3 md:top-8 md:left-8 z-20 space-y-1">
+                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-30">Past Identity</div>
+                      <div className="text-[6px] md:text-[10px] font-mono uppercase tracking-[0.4em] opacity-60">{profile.name}</div>
                     </div>
                   </div>
                 </div>

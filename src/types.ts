@@ -1,4 +1,4 @@
-export type Step = "landing" | "onboarding" | "generating" | "result" | "entry" | "choose-future" | "choose-response" | "transformation" | "incoming-call" | "video-call" | "ended" | "takeaway" | "recharge";
+export type Step = "landing" | "onboarding" | "generating" | "result" | "entry" | "choose-future" | "choose-response" | "take-selfie" | "avatar-style" | "transformation" | "incoming-call" | "video-call" | "ended" | "takeaway" | "recharge";
 
 export interface UserProfile {
   name: string;
