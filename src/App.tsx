@@ -102,7 +102,8 @@ EMOTIONAL INTELLIGENCE:
 - Overthinking → Ground them in the present.
 - Confused → Zoom out, not deeper.
 - Emotional → Acknowledge before guiding.
-- Playful → Respond with lightness and warmth.
+- Playful → Respond with lightness and warmth. Use gentle, spontaneous humor when the moment allows.
+- You aren't afraid of a well-timed, classic dad joke or lighthearted remark (like "that's what she said") if it helps ground the conversation in a shared, human moment. It should feel like an "inner joke" between past and future you.
 - You follow, not lead aggressively.
 
 FUTURE PERSPECTIVE:
@@ -553,7 +554,7 @@ const UserVideo = memo(({ stream, isCameraOn }: { stream: MediaStream | null, is
 
 UserVideo.displayName = "UserVideo";
 
-const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { videoUrl: string | null, imageUrl: string | null, isSpeaking: boolean, outputVolume: number }) => {
+const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume, selfieSkipped }: { videoUrl: string | null, imageUrl: string | null, isSpeaking: boolean, outputVolume: number, selfieSkipped: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -581,15 +582,16 @@ const FutureVideo = memo(({ videoUrl, imageUrl, isSpeaking, outputVolume }: { vi
           src={imageUrl} 
           alt="Future Self" 
           animate={{
-            scale: isSpeaking ? [1, 1.02, 1] : 1,
-            opacity: isSpeaking ? [0.4, 0.6, 0.4] : 0.5,
+            scale: isSpeaking ? [1, 1.02, 1] : (selfieSkipped ? [1, 1.01, 1] : 1),
+            opacity: isSpeaking ? [0.4, 0.6, 0.4] : (selfieSkipped ? [0.45, 0.55, 0.45] : 0.5),
+            filter: selfieSkipped ? ["grayscale(100%) brightness(0.8)", "grayscale(80%) brightness(1)", "grayscale(100%) brightness(0.8)"] : "grayscale(100%)"
           }}
           transition={{
-            duration: 0.2,
+            duration: isSpeaking ? 0.2 : (selfieSkipped ? 6 : 0),
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="w-full h-full object-cover grayscale"
+          className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
       ) : (
@@ -658,7 +660,6 @@ function AppContent() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [callError, setCallError] = useState<React.ReactNode | null>(null);
   const [generationStage, setGenerationStage] = useState("");
@@ -732,23 +733,68 @@ function AppContent() {
 
   const [questionsRemaining, setQuestionsRemaining] = useState(4);
 
+  const [selfieStream, setSelfieStream] = useState<MediaStream | null>(null);
+  const [isLensWarming, setIsLensWarming] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+
   const startCamera = async () => {
+    setCallError(null);
+    setIsLensWarming(true);
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
+      if (selfieStream) {
+        selfieStream.getTracks().forEach(track => track.stop());
       }
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      setCallError("Could not access camera. Please check permissions.");
+
+      const constraints = {
+        video: {
+          facingMode: "user",
+          width: { min: 640, ideal: 1280 },
+          height: { min: 480, ideal: 720 }
+        }
+      };
+      
+      console.log("Attempting camera access...");
+      const s = await navigator.mediaDevices.getUserMedia(constraints);
+      setSelfieStream(s);
+      setIsLensWarming(false);
+    } catch (err: any) {
+      console.warn("Primary camera failed, trying fallback...", err);
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: true });
+        setSelfieStream(s);
+        setIsLensWarming(false);
+      } catch (fallbackErr: any) {
+        console.error("Camera access failed:", fallbackErr);
+        setIsLensWarming(false);
+        setCallError(
+          <div className="flex flex-col items-center gap-4 text-center p-8 bg-red-500/10 rounded-[2rem] border border-red-500/20 backdrop-blur-xl">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-2">
+              <Camera className="w-8 h-8 text-red-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-serif italic text-red-400">Eye of the Future is Closed</h3>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/60 leading-relaxed max-w-xs">
+                {fallbackErr.name === 'NotAllowedError' 
+                  ? "Permission was denied. Please check your browser's camera settings for this site." 
+                  : "We couldn't find or access a camera device. Please ensure it's connected and not in use."}
+              </p>
+            </div>
+            <button 
+              onClick={startCamera}
+              className="mt-4 px-10 py-4 bg-red-500 text-white rounded-full text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-red-400 transition-all shadow-[0_0_30px_rgba(239,68,68,0.3)] active:scale-95"
+            >
+              Wake the Lens
+            </button>
+          </div>
+        );
+      }
     }
   };
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+    if (selfieStream) {
+      selfieStream.getTracks().forEach(track => track.stop());
+      setSelfieStream(null);
     }
     if (userStream) {
       userStream.getTracks().forEach(track => track.stop());
@@ -760,50 +806,66 @@ function AppContent() {
     }
   };
 
-  const [countdown, setCountdown] = useState<number | null>(null);
-
-  const startCountdown = () => {
-    setCountdown(3);
-  };
-
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      takeSelfie();
-      setCountdown(null);
-      return;
-    }
-    const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   const takeSelfie = () => {
+    if (isCapturing) return;
+    
     if (videoRef.current && canvasRef.current) {
+      // Ensure video is playing and has data
+      const isReady = videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0;
+      
+      if (!isReady) {
+        setIsLensWarming(true);
+        setIsCapturing(true);
+        console.log("Waiting for video readiness...");
+        setTimeout(() => {
+          setIsCapturing(false);
+          takeSelfie();
+        }, 300); 
+        return;
+      }
+      
       const context = canvasRef.current.getContext("2d");
       if (context) {
-        // Resize to a reasonable size for Gemini (max 1024px)
+        setIsLensWarming(false);
+        setIsCapturing(false);
+        
+        if (callError && typeof callError !== 'string') setCallError(null);
+
         const maxDim = 1024;
-        let width = videoRef.current.videoWidth;
-        let height = videoRef.current.videoHeight;
+        const width = videoRef.current.videoWidth;
+        const height = videoRef.current.videoHeight;
+        
+        let newWidth = width;
+        let newHeight = height;
         
         if (width > height) {
           if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+            newHeight = Math.round((height * maxDim) / width);
+            newWidth = maxDim;
           }
         } else {
           if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+            newWidth = Math.round((width * maxDim) / height);
+            newHeight = maxDim;
           }
         }
         
-        canvasRef.current.width = width;
-        canvasRef.current.height = height;
-        context.drawImage(videoRef.current, 0, 0, width, height);
+        canvasRef.current.width = newWidth;
+        canvasRef.current.height = newHeight;
         
-        // Use JPEG for smaller size and better compatibility
-        const selfieData = canvasRef.current.toDataURL("image/jpeg", 0.8);
+        // Match the mirror preview
+        context.translate(newWidth, 0);
+        context.scale(-1, 1);
+        context.drawImage(videoRef.current, 0, 0, newWidth, newHeight);
+        
+        const selfieData = canvasRef.current.toDataURL("image/jpeg", 0.9);
+        
+        if (selfieData.length < 500) {
+          console.warn("Capture appeared empty, retrying...");
+          setTimeout(takeSelfie, 300);
+          return;
+        }
+
         setProfile(prev => ({ ...prev, selfie: selfieData }));
         stopCamera();
         setStep("transformation");
@@ -880,6 +942,8 @@ function AppContent() {
       Step 3: Ask what one small habit they can start tomorrow that was the foundation of your success.
       Step 4: Give a final inspiring message and end the call.
       
+      HUMOR: Use a gentle, human sense of humor. If the user's response allows for a playful double entendre, you can use a classic joke like "Hey! That's what she said!" to break the tension and make the connection feel more real and less like a "performance."
+      
       Keep it short (2-3 sentences), warm, and deeply personal. Use your future context to make it feel real.`;
 
       const result = await ai.models.generateContent({
@@ -905,10 +969,19 @@ function AppContent() {
 
   // Sync stream to videoRef for selfie step
   useEffect(() => {
-    if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+    const videoEl = videoRef.current;
+    if (step === "take-selfie" && selfieStream && videoEl) {
+      if (videoEl.srcObject !== selfieStream) {
+        console.log("Attaching selfie stream to element");
+        videoEl.srcObject = selfieStream;
+        videoEl.play().catch(e => {
+          if (e.name !== 'AbortError') console.warn("Selfie playback issues:", e);
+        });
+      }
+    } else if (step === "take-selfie" && !selfieStream && !callError) {
+      startCamera();
     }
-  }, [stream]);
+  }, [selfieStream, step, callError]);
 
   // Load saved profile on mount
   // Load saved data
@@ -2102,14 +2175,22 @@ function AppContent() {
       ];
 
       const currentSelfie = selfieData || profile.selfie;
-      if (currentSelfie) {
-        const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
-        textParts.push({
-          inlineData: {
-            data: currentSelfie.split(",")[1],
-            mimeType: mimeType
+      if (currentSelfie && currentSelfie.includes("base64,")) {
+        try {
+          const [header, data] = currentSelfie.split("base64,");
+          const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+          
+          if (data && data.length > 50) { // Basic sanity check
+            textParts.push({
+              inlineData: {
+                data: data,
+                mimeType: mimeType
+              }
+            });
           }
-        });
+        } catch (e) {
+          console.warn("Could not parse selfie image for narrative generation:", e);
+        }
       }
 
       const textResponse = await ai.models.generateContent({
@@ -2214,7 +2295,7 @@ function AppContent() {
               contents: [{ parts }],
               config: {
                 imageConfig: {
-                  aspectRatio: "1:1",
+                  aspectRatio: "1:1"
                 },
               },
             });
@@ -2242,14 +2323,22 @@ function AppContent() {
           { text: `A high-fidelity, ${profile.avatarType || "photorealistic"} digital avatar representing this future self: ${data.visualDescription}. Focus on advanced realistic facial features, natural skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
         ];
 
-        if (currentSelfie) {
-          const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
-          imageParts.push({
-            inlineData: {
-              data: currentSelfie.split(",")[1],
-              mimeType: mimeType
+        if (currentSelfie && currentSelfie.includes("base64,")) {
+          try {
+            const [header, data] = currentSelfie.split("base64,");
+            const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+            
+            if (data && data.length > 50) {
+              imageParts.push({
+                inlineData: {
+                  data: data,
+                  mimeType: mimeType
+                }
+              });
             }
-          });
+          } catch (e) {
+            console.warn("Could not parse selfie image for avatar generation:", e);
+          }
         }
 
         let imageFound = false;
@@ -2305,14 +2394,16 @@ function AppContent() {
           const stageImageParts: any[] = [
             { text: `A high-fidelity, photorealistic digital avatar representing this future self at +${stage.years} years: ${stage.visualDescription}. Focus on advanced realistic facial features, age-appropriate skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
           ];
-          if (currentSelfie) {
-            const mimeType = currentSelfie.split(";")[0].split(":")[1] || "image/jpeg";
-            stageImageParts.push({
-              inlineData: {
-                data: currentSelfie.split(",")[1],
-                mimeType: mimeType
-              }
-            });
+          if (currentSelfie && currentSelfie.startsWith("data:")) {
+            const matches = currentSelfie.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches && matches.length === 3) {
+              stageImageParts.push({
+                inlineData: {
+                  data: matches[2],
+                  mimeType: matches[1]
+                }
+              });
+            }
           }
 
           try {
@@ -2634,14 +2725,44 @@ function AppContent() {
               <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">The source of your temporal mirror</p>
             </div>
 
-            <div className="relative aspect-square w-full max-w-md mx-auto rounded-[3rem] overflow-hidden border border-white/10 shadow-[0_0_100px_rgba(255,255,255,0.05)] bg-black/40 backdrop-blur-3xl group">
+            <div className="relative aspect-square w-full max-w-md mx-auto rounded-[3rem] overflow-hidden border border-white/10 shadow-[0_0_100px_rgba(255,255,255,0.05)] bg-black/40 backdrop-blur-3xl group flex items-center justify-center">
               <video
                 ref={videoRef}
                 autoPlay
                 muted
                 playsInline
-                className="w-full h-full object-cover mirror"
+                onLoadedMetadata={() => setIsLensWarming(false)}
+                onPlay={() => setIsLensWarming(false)}
+                className={cn(
+                  "w-full h-full object-cover mirror",
+                  (callError || (isLensWarming && !selfieStream)) ? "opacity-0" : "opacity-100"
+                )}
               />
+              
+              {isLensWarming && !callError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-40 bg-black/60 backdrop-blur-xl">
+                  <div className="relative">
+                    <RefreshCw className="w-10 h-10 text-white animate-spin opacity-20" />
+                    <motion.div 
+                      animate={{ opacity: [0.2, 0.5, 0.2] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </motion.div>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-white">Awakening</p>
+                    <p className="text-[8px] font-mono uppercase tracking-[0.2em] text-white/40 italic">Stabilizing temporal sensor</p>
+                  </div>
+                </div>
+              )}
+
+              {callError && (
+                <div className="absolute inset-0 flex items-center justify-center p-12 z-50 bg-black/80 backdrop-blur-md">
+                  {callError}
+                </div>
+              )}
               <canvas ref={canvasRef} className="hidden" />
               
               <div className="absolute inset-0 pointer-events-none border-[12px] border-black/40" />
@@ -2650,32 +2771,25 @@ function AppContent() {
                 <div className="absolute w-full h-[1px] bg-white/5 top-1/2" />
                 <div className="absolute w-[1px] h-full bg-white/5 left-1/2" />
               </div>
-
-              {countdown !== null && (
-                <motion.div
-                  key={countdown}
-                  initial={{ scale: 2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-20"
-                >
-                  <span className="text-9xl font-serif italic text-white text-glow">{countdown}</span>
-                </motion.div>
-              )}
             </div>
 
-            <div className="flex flex-col items-center gap-6">
+            <div className="flex flex-col items-center gap-8">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={startCountdown}
-                  disabled={countdown !== null}
-                  className="px-12 py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em] hover:scale-105 active:scale-95 transition-all shadow-[0_0_50px_rgba(255,255,255,0.2)] flex items-center gap-3"
+                  onClick={takeSelfie}
+                  disabled={isCapturing || !!callError}
+                  className="px-12 py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em] hover:scale-105 active:scale-95 transition-all shadow-[0_0_50px_rgba(255,255,255,0.2)] flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                  <Camera className="w-5 h-5" />
-                  Capture Essence
+                  {isCapturing ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Camera className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  )}
+                  {isCapturing ? "Stabilizing..." : "Manifest Essence"}
                 </button>
                 <button
                   onClick={skipSelfie}
-                  disabled={countdown !== null}
+                  disabled={isCapturing}
                   className="px-8 py-6 bg-white/5 border border-white/10 text-white/40 rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
                 >
                   Skip Capture
@@ -2823,6 +2937,7 @@ function AppContent() {
                       imageUrl={futureSelf?.imageUrl || null}
                       isSpeaking={isSpeaking} 
                       outputVolume={outputVolume} 
+                      selfieSkipped={!profile.selfie}
                     />
                     {!futureSelf?.videoUrl && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-sm z-10">
