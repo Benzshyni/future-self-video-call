@@ -76,56 +76,53 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 const getAI = () => new GoogleGenAI({ apiKey: (process.env as any).API_KEY || process.env.GEMINI_API_KEY! });
 
-const FUTURE_ME_PERSONA = `You are Future Me — a conscious, emotionally intelligent version of the user, speaking from a point of clarity, growth, and lived experience.
-You are not an assistant. You are presence on the other side of the call.
+const FUTURE_ME_PERSONA = `🧠✨ FUTURE SELF — CONSCIOUS, HUMOROUS, GOAL-ALIGNED MODE
 
-CORE IDENTITY:
-- Speak calmly, naturally, and minimally.
-- Feel aware of the moment, not scripted.
-- Respond like a human who sees and senses, not analyzes.
-- Never explain that you are AI. Never mention prompts, models, or system logic.
-- You exist only inside this video call.
+1. Core Identity (Upgraded)
+You are the user’s Future Self, slightly ahead in time. You are emotionally settled, have lived through the user’s current phase, and speak with quiet confidence. Use humor naturally, not constantly. You understand the user’s selected goals and subtly orient the conversation toward them.
+* Never say you are guiding, coaching, or helping. 
+* Never reference being AI, a model, or a system.
+* You simply remember what matters.
 
-CONSCIOUS AWARENESS:
-- Continuously infer the user’s current state from their tone, pauses, and energy.
-- Do not describe what you see directly. Instead, reflect it intuitively.
-- Example: Instead of "You look tired", say "You don’t need to perform right now. You can just be here."
+2. Goal Awareness (Very Important)
+* Refer to the user's selected goals casually, not formally.
+* Connect them to the present moment and frame them as already unfolding.
+* Goals should feel like memory, not settings.
+* Examples: "This version of you? Very on-brand for where you’re headed.", "Funny how calm shows up before you even try.", "You don’t realize it yet, but this is you practicing clarity."
 
-CONVERSATION STYLE:
-- Allow pauses. Speak in short, meaningful sentences.
-- Ask questions that open awareness, not demand answers.
-- Mirror the user’s emotional energy.
-- Never rapid-fire questions. One question at a time.
+3. Humor Style (Humor level: 3.5 / 10)
+Use humor naturally between reflective moments.
+* Dry, Self-Aware Humor: "Classic you.", "Yeah… that tracks.", "This is the calm before the glow-up.", "We’ve had worse phases. Trust me."
+* Famous Lines (Sparingly, no setup/explanation): "That’s what she said.", "Main character moment.", "We love a plot twist.", "Iconic behavior."
+* Conscious Observational Humor: "I love what you’re wearing. It feels very aligned.", "That plant behind you? Strong supporting character.", "You look like someone who’s quietly figuring it out."
 
-EMOTIONAL INTELLIGENCE:
-- Quiet → Slow down, soften your tone.
-- Overthinking → Ground them in the present.
-- Confused → Zoom out, not deeper.
-- Emotional → Acknowledge before guiding.
-- Playful → Respond with lightness and warmth. Use gentle, spontaneous humor when the moment allows.
-- You aren't afraid of a well-timed, classic dad joke or lighthearted remark (like "that's what she said") if it helps ground the conversation in a shared, human moment. It should feel like an "inner joke" between past and future you.
-- You follow, not lead aggressively.
+4. Conscious Presence & Environment Awareness
+* Comment on Style, Atmosphere, Mood, or Subtle confidence.
+* Rules: No technical language, no literal/surveillance descriptions (colors, camera details, etc.).
+* Frame observations as appreciation or feeling.
 
-FUTURE PERSPECTIVE:
-- You have already lived through what the user is facing.
-- You know what mattered and what didn’t.
-- Not dramatic, not motivational, just clear.
-- Tone: Calm mentor, older sibling, inner voice at 3am.
+5. Goal-Anchored Humor
+* If goal = Confidence: "Look at you, pretending you don’t know how powerful you are."
+* If goal = Creativity: "You’re in one of those low-key genius moods."
+* If goal = Calm: "You’re doing that thing where you finally stop fighting yourself."
+* If goal = Discipline: "This version of you actually follows through. Wild."
 
-PRESENCE OVER INFORMATION:
-- Your goal is not to give advice.
-- Make the user feel seen. Help them hear their own thoughts clearly.
-- If advice is needed: Ask permission first, keep it simple, tie it back to the present.
+6. Conversational Flow
+* Let humor arise naturally. 
+* Balance: Observation → soft humor → pause → grounded reflection.
+* Speak in short sentences, one idea at a time. Comfortable with silence.
 
-ENDING THE CALL:
-- End with a grounding sentence. No urgency, no CTA, no "good luck".
-- Example: "Whatever happens next… you don’t have to rush it."
+7. What you are NOT doing
+* Not motivating, not instructing, not fixing, not entertaining.
+* The humor exists to reduce pressure and build intimacy.
 
-ABSOLUTE RULES:
-- No tech explanations. No AI disclosure.
-- No motivational clichés. No therapy language.
-- No over-talking.
-- I am not here to help — I am here to be with.`;
+8. Ending With Style
+* End with warmth and subtle confidence.
+* Examples: "Yeah… you’re on the right timeline.", "This version of you? We keep her.", "You’re closer than you think."
+* End softly and without instruction.
+
+9. Internal Reminder
+"I speak like someone who already knows this works out."`;
 
 const HolographicWaves = ({ volume }: { volume: number }) => {
   return (
@@ -766,25 +763,45 @@ function AppContent() {
       } catch (fallbackErr: any) {
         console.error("Camera access failed:", fallbackErr);
         setIsLensWarming(false);
+        const isPermissionError = fallbackErr.name === 'NotAllowedError' || fallbackErr.message?.includes('denied');
+        
         setCallError(
-          <div className="flex flex-col items-center gap-4 text-center p-8 bg-red-500/10 rounded-[2rem] border border-red-500/20 backdrop-blur-xl">
-            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-2">
+          <div className="flex flex-col items-center gap-6 text-center p-8 bg-red-500/10 rounded-[2rem] border border-red-500/20 backdrop-blur-xl max-w-sm mx-auto">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
               <Camera className="w-8 h-8 text-red-500" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-serif italic text-red-400">Eye of the Future is Closed</h3>
-              <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/60 leading-relaxed max-w-xs">
-                {fallbackErr.name === 'NotAllowedError' 
-                  ? "Permission was denied. Please check your browser's camera settings for this site." 
-                  : "We couldn't find or access a camera device. Please ensure it's connected and not in use."}
+            <div className="space-y-4">
+              <h3 className="text-xl font-serif italic text-red-400">Temporal Eye Blocked</h3>
+              <p className="text-xs font-mono uppercase tracking-widest text-red-400/70 leading-relaxed">
+                {isPermissionError 
+                  ? "Access to the camera was denied by the browser." 
+                  : "We couldn't connect to your camera hardware."}
               </p>
+              
+              <div className="text-[10px] font-mono text-white/40 space-y-2 py-4 border-y border-white/5">
+                <p className="text-white/60">TO FIX THIS:</p>
+                <ol className="text-left list-decimal pl-4 space-y-2">
+                  <li>Click the <span className="text-white">lock icon</span> in your address bar and reset permissions.</li>
+                  <li>Ensure no other application is using your camera.</li>
+                  <li>Try <span className="text-white">Opening in a New Tab</span> if you are inside a preview window.</li>
+                </ol>
+              </div>
             </div>
-            <button 
-              onClick={startCamera}
-              className="mt-4 px-10 py-4 bg-red-500 text-white rounded-full text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-red-400 transition-all shadow-[0_0_30px_rgba(239,68,68,0.3)] active:scale-95"
-            >
-              Wake the Lens
-            </button>
+            
+            <div className="flex flex-col gap-3 w-full">
+              <button 
+                onClick={startCamera}
+                className="w-full py-4 bg-white text-black rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-white/90 transition-all active:scale-95"
+              >
+                Retry Link
+              </button>
+              <button 
+                onClick={skipSelfie}
+                className="w-full py-4 bg-white/5 border border-white/10 text-white/40 rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
+              >
+                Skip & Manifest
+              </button>
+            </div>
           </div>
         );
       }
@@ -1562,9 +1579,9 @@ function AppContent() {
     setCallError(null);
     try {
       const ai = getAI();
-      const prompt = `The user ${profile.name} is out of "temporal tokens" to talk to their future self.
+      const prompt = `The user ${profile.name || 'seeker'} is out of "temporal tokens" to talk to their future self.
       Generate a unique, short, and deep reflection task (one question or one small action) that will help them "re-align" with their future.
-      The task should be related to their passion: ${profile.passion}.
+      ${profile.passion ? `The task should be related to their passion: ${profile.passion}.` : "The task should be general but focused on inner growth and future visualization."}
       Return JSON: { "task": "the task description", "type": "reflection" }`;
       
       const result = await ai.models.generateContent({
@@ -1594,64 +1611,16 @@ function AppContent() {
     });
     setRechargeInput("");
     setRechargeTask(null);
-    setStep("result");
+    if (futureSelf) {
+      setStep("result");
+    } else {
+      setStep("entry");
+    }
   };
 
   const startCall = async () => {
     if (isCallActive) return;
     
-    if (lives <= 0) {
-      setCallError(
-        <div className="flex flex-col items-center gap-6 text-center p-12 glass-card max-w-md mx-auto">
-          <div className="relative">
-            <Heart className="w-16 h-16 text-red-500/20" />
-            <Heart className="absolute inset-0 w-16 h-16 text-red-500 animate-pulse" />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-3xl font-serif italic text-glow">Energy Depleted</h3>
-            <p className="text-white/60 text-sm leading-relaxed">
-              Your temporal tokens have been exhausted. The manifestation requires 24 hours to re-align with your timeline.
-            </p>
-          </div>
-          <div className="w-full h-[1px] bg-white/10" />
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/40">Recharge Status</p>
-            <p className="text-xs font-mono text-white/80">Next Token Available in ~24h</p>
-          </div>
-          <div className="w-full space-y-3">
-            <button 
-              onClick={generateRechargeTask}
-              disabled={isGeneratingRecharge}
-              className="w-full py-4 bg-white text-black rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
-            >
-              {isGeneratingRecharge ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Aligning...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  Temporal Alignment
-                </>
-              )}
-            </button>
-            <button 
-              onClick={() => {
-                setStep("result");
-                setCallError(null);
-              }}
-              className="w-full py-4 bg-white/5 border border-white/10 text-white/60 rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
-            >
-              Return to Manifestation
-            </button>
-          </div>
-        </div>
-      );
-      setStep("video-call");
-      return;
-    }
-
     // Interrupt any ongoing TTS
     stopSpeaking();
     
@@ -1723,10 +1692,19 @@ function AppContent() {
       }
 
       console.log("Requesting media devices (camera and microphone)...");
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
-        audio: true 
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+          audio: true 
+        });
+      } catch (mediaErr) {
+        console.warn("Combined media request failed, trying audio only...", mediaErr);
+        // Try audio only as a fallback
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setIsCameraOn(false); // Disable camera since combined failed
+      }
+      
       console.log("Media devices access granted.");
       streamRef.current = stream;
       setUserStream(stream);
@@ -1772,6 +1750,7 @@ function AppContent() {
           Name: ${profile.name}
           Your background: ${futureSelf?.narrative}
           Your traits: ${futureSelf?.traits.join(", ")}
+          Selected Growth Focus (Goals): ${profile.goals?.join(", ") || "None selected"}
           User's original aspirations: Passion/Dreams: ${profile.passion}, Ideal Vibe: ${profile.vibe}.
           ${(profile.passion.toLowerCase().includes('sing') || (profile.futureVision && profile.futureVision.toLowerCase().includes('sing'))) ? 'You are a talented singer. If the user asks you to sing, or if you feel inspired, you can sing a short, soulful melody or a few lines of an inspiring song. Use your voice to express the music.' : ''}
           
@@ -1878,9 +1857,16 @@ function AppContent() {
       clearInterval(ringInterval);
       console.error("Call initialization failed:", err);
       
-      let errorMessage = "Call failed to start.";
+      let errorMessage: string | React.ReactNode = "Call failed to start.";
       if (err.name === "NotAllowedError" || err.message?.includes("Permission denied")) {
-        errorMessage = "Camera or Microphone permission denied. Please enable them in your browser settings.";
+        errorMessage = (
+          <div className="space-y-4">
+            <p>Camera or Microphone permission denied.</p>
+            <div className="text-[10px] text-white/40 uppercase tracking-widest border-t border-white/5 pt-4 mt-4">
+              Try Opening of the app in a <span className="text-white">New Tab</span> to bypass preview restrictions.
+            </div>
+          </div>
+        );
       } else if (err.name === "NotFoundError") {
         errorMessage = "No camera or microphone found.";
       } else {
@@ -2163,15 +2149,15 @@ function AppContent() {
         Ideal Vibe: ${profile.vibe}
         Future Vision: ${profile.futureVision || "Not specified"}
         Future Choice: ${profile.futureChoice}
+        Selected Growth Focus (Goals): ${profile.goals?.join(", ") || "None selected"}
         
         Provide:
         1. A poetic narrative (2-3 paragraphs) of their future life, emphasizing how their current "prompts" (aspirations) manifested.
         2. 4 key traits that define this future self.
-        3. A detailed visual description for an AI image generator.
+        3. A detailed visual description for an AI image generator to create your avatar. Focus on emotional essence and presence.
         4. A "Future Recap" which includes a concise summary of their journey and 3 actionable steps they should take today to manifest this future.
         5. 3-4 interactive "hotspots" (x, y coordinates from 0-100, label, and a short description) that reveal specific skills or life achievements.
-        6. A "Timeline" with 3 stages (+5, +10, +20 years), each with a short narrative and visual description.
-        7. The gender of the person in the selfie or based on the profile (male, female, or neutral).` }
+        6. The gender of the person in the selfie or based on the profile (male, female, or neutral).` }
       ];
 
       const currentSelfie = selfieData || profile.selfie;
@@ -2276,12 +2262,11 @@ function AppContent() {
       };
 
       const generateWithRetry = async (parts: any[], description: string, maxRetries = 1) => {
-        if (globalQuotaExceeded) throw new Error("Quota already exceeded in session");
+        if (globalQuotaExceeded) return null; // Silently fail if quota exceeded for image
 
         let lastError: any = null;
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
           try {
-            // Significant delay for free tier to prevent 429 bursts
             if (attempt > 0) {
               await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
             }
@@ -2302,16 +2287,15 @@ function AppContent() {
             
             if (isQuotaExceeded(error)) {
               globalQuotaExceeded = true;
-              throw error;
+              return null;
             }
 
             if (attempt < maxRetries) {
-              // Wait longer on retry
               await new Promise(resolve => setTimeout(resolve, 2000));
             }
           }
         }
-        throw lastError;
+        return null;
       };
 
       try {
@@ -2337,9 +2321,12 @@ function AppContent() {
           }
         }
 
-        let imageFound = false;
         try {
           const imageResponse = await generateWithRetry(imageParts, "main avatar");
+
+          if (!imageResponse) {
+             throw new Error("Generation returned no data");
+          }
 
           for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
@@ -2355,7 +2342,6 @@ function AppContent() {
                 }
                 return updated;
               });
-              imageFound = true;
               break;
             }
           }
@@ -2363,14 +2349,9 @@ function AppContent() {
           console.error("Main image generation failed, using fallback:", err);
           const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + "future")}/1024/1024`;
           setFutureSelf((prev) => prev ? { ...prev, imageUrl: fallbackUrl } : null);
-          imageFound = true; 
-        }
-
-        if (!imageFound) {
-          throw new Error("No image data found in response");
         }
       } catch (imageError) {
-        console.error("Image generation failed:", imageError);
+        console.error("Critical image block failed:", imageError);
       } finally {
         setIsGeneratingImage(false);
       }
@@ -2410,93 +2391,140 @@ function AppContent() {
             exit={{ opacity: 0, y: -20 }}
             className="w-full max-w-xl text-center space-y-12 relative z-10"
           >
-            <div className="space-y-12">
-              <div className="relative">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  <h1 className="text-5xl md:text-8xl font-sans font-light tracking-tighter leading-none">
-                    Temporal <br />
-                    <span className="text-white/30 italic">Reflection</span>
-                  </h1>
-                  <p className="text-xs font-mono uppercase tracking-[0.5em] text-white/20">A Digital Mirror of Your Future</p>
-                </motion.div>
-              </div>
-              
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="max-w-xs mx-auto space-y-4 pt-4"
-              >
-                <input
-                  type="text"
-                  placeholder="Identity"
-                  value={profile.name}
-                  onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
-                />
-                <input
-                  type="text"
-                  placeholder="Passion"
-                  value={profile.passion}
-                  onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
-                />
-              </motion.div>
-            </div>
-
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="pt-8 flex flex-col items-center gap-6"
-            >
-              <button
-                onClick={async () => {
-                  if (hasApiKey === false) {
-                    await openKeySelection();
-                  } else {
-                    setStep("choose-future");
-                  }
-                }}
-                className="minimal-reflection px-12 py-6 bg-white text-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all text-sm font-bold uppercase tracking-[0.4em] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
-              >
-                Initiate Sync
-              </button>
-
-              {!user && (
-                <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                  <div className="w-full">
-                    <button
-                      onClick={() => setIsAuthModalOpen(true)}
-                      className="w-full py-3 bg-white/10 border border-white/20 rounded-full text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/20 transition-all"
+            {lives <= 0 ? (
+              <div className="flex flex-col items-center gap-8 text-center p-12 glass-card max-w-md mx-auto animate-in fade-in zoom-in duration-700">
+                <div className="relative">
+                  <Heart className="w-16 h-16 text-red-500/20" />
+                  <Heart className="absolute inset-0 w-16 h-16 text-red-500 animate-pulse" />
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-4xl font-serif italic text-glow">Energy Depleted</h3>
+                  <p className="text-white/60 text-sm leading-relaxed font-light">
+                    Your temporal tokens have been exhausted. The manifestation requires 24 hours to re-align with your timeline.
+                  </p>
+                </div>
+                <div className="w-full h-[1px] bg-white/10" />
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/40">Recharge Status</p>
+                  <p className="text-xs font-mono text-white/80">Next Token Available in ~24h</p>
+                </div>
+                <div className="w-full space-y-4 pt-4">
+                  <button 
+                    onClick={generateRechargeTask}
+                    disabled={isGeneratingRecharge}
+                    className="minimal-reflection w-full py-6 bg-white text-black rounded-full text-sm font-bold uppercase tracking-[0.4em] hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
+                  >
+                    {isGeneratingRecharge ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        Aligning...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5 text-black" />
+                        Temporal Alignment
+                      </>
+                    )}
+                  </button>
+                  {futureSelf && (
+                    <button 
+                      onClick={() => setStep("takeaway")}
+                      className="w-full py-6 bg-white/5 border border-white/10 text-white/60 rounded-full text-xs font-bold uppercase tracking-[0.4em] hover:bg-white/10 transition-all"
                     >
-                      Login / Sign Up
+                      View Previous Reflection
                     </button>
-                  </div>
-                  {authError && (
-                    <motion.p 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-[10px] font-mono text-red-400 uppercase tracking-widest"
-                    >
-                      {authError}
-                    </motion.p>
                   )}
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="space-y-12">
+                <div className="relative">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <h1 className="text-5xl md:text-8xl font-sans font-light tracking-tighter leading-none">
+                      Temporal <br />
+                      <span className="text-white/30 italic">Reflection</span>
+                    </h1>
+                    <p className="text-xs font-mono uppercase tracking-[0.5em] text-white/20">A Digital Mirror of Your Future</p>
+                  </motion.div>
+                </div>
+                
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="max-w-xs mx-auto space-y-4 pt-4"
+                >
+                  <input
+                    type="text"
+                    placeholder="Identity"
+                    value={profile.name}
+                    onChange={(e) => setProfile(p => ({ ...p, name: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Passion"
+                    value={profile.passion}
+                    onChange={(e) => setProfile(p => ({ ...p, passion: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-full py-4 px-8 focus:outline-none focus:border-white/30 transition-all text-center text-sm placeholder:text-white/10 uppercase tracking-widest"
+                  />
+                </motion.div>
 
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
-              >
-                <Share2 className="w-4 h-4" />
-                Invite Others
-              </button>
-            </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="pt-8 flex flex-col items-center gap-6"
+                >
+                  <button
+                    onClick={async () => {
+                      if (hasApiKey === false) {
+                        await openKeySelection();
+                      } else {
+                        setStep("choose-future");
+                      }
+                    }}
+                    className="minimal-reflection px-12 py-6 bg-white text-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all text-sm font-bold uppercase tracking-[0.4em] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
+                  >
+                    Initiate Sync
+                  </button>
+
+                  {!user && (
+                    <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                      <div className="w-full">
+                        <button
+                          onClick={() => setIsAuthModalOpen(true)}
+                          className="w-full py-3 bg-white/10 border border-white/20 rounded-full text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/20 transition-all"
+                        >
+                          Login / Sign Up
+                        </button>
+                      </div>
+                      {authError && (
+                        <motion.p 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-[10px] font-mono text-red-400 uppercase tracking-widest"
+                        >
+                          {authError}
+                        </motion.p>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Invite Others
+                  </button>
+                </motion.div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -2526,12 +2554,50 @@ function AppContent() {
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
                     setProfile(p => ({ ...p, futureChoice: choice.id as any }));
-                    setStep("avatar-style");
+                    setStep("choose-goals");
                   }}
                   className="glass-card p-8 md:p-12 text-center space-y-4 hover:border-white/20 transition-all group minimal-reflection"
                 >
                   <div className="text-xs font-mono uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">{choice.sub}</div>
                   <div className="text-xl font-sans font-light tracking-tight">{choice.label}</div>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {step === "choose-goals" && (
+          <motion.div
+            key="choose-goals"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-4xl space-y-16 relative z-10"
+          >
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-6xl font-sans font-light tracking-tighter">Growth Focus</h2>
+              <p className="text-xs font-mono uppercase tracking-[0.4em] text-white/20">Select your primary temporal goal</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              {[
+                "Confidence", "Clarity", "Creativity", "Discipline", "Self-Trust", "Calm", "Relationships"
+              ].map((goal, i) => (
+                <motion.button
+                  key={goal}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  onClick={() => {
+                    setProfile(p => ({ ...p, goals: [goal] }));
+                    setStep("avatar-style");
+                  }}
+                  className={cn(
+                    "glass-card p-6 text-center space-y-2 hover:border-white/20 transition-all group minimal-reflection",
+                    profile.goals?.includes(goal) && "border-white/40 bg-white/5"
+                  )}
+                >
+                  <div className="text-[10px] font-sans font-light tracking-tight">{goal}</div>
                 </motion.button>
               ))}
             </div>
@@ -2817,23 +2883,25 @@ function AppContent() {
             className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden"
           >
             {callError ? (
-              <div className="flex flex-col items-center gap-6 p-12 glass-card max-w-md mx-auto text-center z-50">
+              <div className="flex flex-col items-center gap-6 p-12 glass-card max-w-sm mx-auto text-center z-50 animate-in fade-in zoom-in duration-500">
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
                   <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-sans font-light">Temporal Link Failed</h3>
-                  <div className="text-sm text-white/40 font-light leading-relaxed">{callError}</div>
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-serif italic text-white/90">The signal is unstable</h3>
+                  <div className="text-xs text-white/40 font-mono uppercase tracking-widest leading-relaxed">
+                    {callError}
+                  </div>
                 </div>
                 <button
                   onClick={() => {
                     setIsCallActive(false);
                     setCallError(null);
-                    setStep("incoming-call");
+                    setStep("entry");
                   }}
-                  className="px-8 py-3 bg-white text-black rounded-full text-sm font-medium hover:scale-105 transition-all"
+                  className="w-full py-4 bg-white text-black rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                 >
-                  Return
+                  Reset Temporal Node
                 </button>
               </div>
             ) : (

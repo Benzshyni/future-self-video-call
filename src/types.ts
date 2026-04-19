@@ -1,4 +1,4 @@
-export type Step = "landing" | "onboarding" | "generating" | "result" | "entry" | "choose-future" | "choose-response" | "take-selfie" | "avatar-style" | "transformation" | "incoming-call" | "video-call" | "ended" | "takeaway" | "recharge";
+export type Step = "landing" | "onboarding" | "generating" | "result" | "entry" | "choose-future" | "choose-goals" | "choose-response" | "take-selfie" | "avatar-style" | "transformation" | "incoming-call" | "video-call" | "ended" | "takeaway" | "recharge";
 
 export interface UserProfile {
   name: string;
@@ -11,6 +11,7 @@ export interface UserProfile {
   style: "realistic" | "dream-like" | "minimal";
   avatarType?: "humanoid" | "abstract" | "energy" | "caricature";
   gender?: "male" | "female" | "neutral";
+  goals?: string[];
 }
 
 export interface FutureSelf {
