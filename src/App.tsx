@@ -2281,15 +2281,23 @@ function AppContent() {
       setGenerationStage("Visualizing future manifestation...");
       setIsGeneratingImage(true);
       
+      let globalQuotaExceeded = false;
       const isQuotaExceeded = (error: any) => {
-        const errorStr = JSON.stringify(error);
-        return errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("quota");
+        const errorStr = JSON.stringify(error).toLowerCase();
+        return errorStr.includes("429") || errorStr.includes("resource_exhausted") || errorStr.includes("quota");
       };
 
-      const generateWithRetry = async (parts: any[], description: string, maxRetries = 2) => {
+      const generateWithRetry = async (parts: any[], description: string, maxRetries = 1) => {
+        if (globalQuotaExceeded) throw new Error("Quota already exceeded in session");
+
         let lastError: any = null;
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
           try {
+            // Significant delay for free tier to prevent 429 bursts
+            if (attempt > 0) {
+              await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+            }
+
             const response = await ai.models.generateContent({
               model: "gemini-2.5-flash-image",
               contents: [{ parts }],
@@ -2302,16 +2310,16 @@ function AppContent() {
             return response;
           } catch (error) {
             lastError = error;
-            console.warn(`Image generation attempt ${attempt + 1} failed:`, error);
+            console.warn(`Image generation [${description}] attempt ${attempt + 1} failed:`, error);
             
-            // If quota is exceeded, don't bother retrying
             if (isQuotaExceeded(error)) {
+              globalQuotaExceeded = true;
               throw error;
             }
 
             if (attempt < maxRetries) {
-              // Exponential backoff
-              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+              // Wait longer on retry
+              await new Promise(resolve => setTimeout(resolve, 2000));
             }
           }
         }
@@ -2367,7 +2375,7 @@ function AppContent() {
           console.error("Main image generation failed, using fallback:", err);
           const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + "future")}/1024/1024`;
           setFutureSelf((prev) => prev ? { ...prev, imageUrl: fallbackUrl } : null);
-          imageFound = true; // Mark as found so we don't throw below
+          imageFound = true; 
         }
 
         if (!imageFound) {
@@ -2375,11 +2383,10 @@ function AppContent() {
         }
 
         // 3. Generate Images for other timeline stages
-        let quotaExceeded = false;
         for (let i = 0; i < data.timelineStages.length; i++) {
           const stage = data.timelineStages[i];
           
-          if (quotaExceeded) {
+          if (globalQuotaExceeded) {
             // Use fallback immediately if we already know quota is gone
             const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
             setFutureSelf((prev) => {
@@ -2407,8 +2414,8 @@ function AppContent() {
           }
 
           try {
-            // Add a small delay between stage generations to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Significant delay between stage generations to respect free tier QPM
+            await new Promise(resolve => setTimeout(resolve, 5000));
 
             const stageImageResponse = await generateWithRetry(stageImageParts, `timeline stage ${i}`);
 
@@ -2426,9 +2433,6 @@ function AppContent() {
             }
           } catch (err) {
             console.warn(`Stage ${i} generation failed, using fallback:`, err);
-            if (isQuotaExceeded(err)) {
-              quotaExceeded = true;
-            }
             const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
             setFutureSelf((prev) => {
               if (!prev || !prev.timelineStages) return prev;
@@ -2538,34 +2542,12 @@ function AppContent() {
 
               {!user && (
                 <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                  <div className="flex items-center gap-3 w-full">
+                  <div className="w-full">
                     <button
                       onClick={() => setIsAuthModalOpen(true)}
-                      className="flex-1 py-3 bg-white/10 border border-white/20 rounded-full text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/20 transition-all"
+                      className="w-full py-3 bg-white/10 border border-white/20 rounded-full text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/20 transition-all"
                     >
                       Login / Sign Up
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setAuthError(null);
-                        try {
-                          const { data, error } = await supabase.auth.signInAnonymously();
-                          if (error) throw error;
-                          if (data.user) setUser(data.user);
-                        } catch (err: any) {
-                          console.warn("Supabase guest login failed, falling back to local guest mode:", err);
-                          // Fallback to local guest mode so the app remains functional
-                          setUser({
-                            id: 'local-guest-' + Math.random().toString(36).substr(2, 9),
-                            email: 'guest@local.manifest',
-                            is_anonymous: true,
-                            user_metadata: { full_name: 'Guest Traveler' }
-                          });
-                        }
-                      }}
-                      className="flex-1 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
-                    >
-                      Guest Access
                     </button>
                   </div>
                   {authError && (
