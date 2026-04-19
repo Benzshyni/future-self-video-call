@@ -2225,21 +2225,9 @@ function AppContent() {
                   required: ["x", "y", "label", "description"],
                 },
               },
-              timelineStages: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    years: { type: Type.NUMBER },
-                    narrative: { type: Type.STRING },
-                    visualDescription: { type: Type.STRING },
-                  },
-                  required: ["years", "narrative", "visualDescription"],
-                },
-              },
               gender: { type: Type.STRING, enum: ["male", "female", "neutral"] },
             },
-            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "timelineStages", "gender"],
+            required: ["narrative", "traits", "visualDescription", "recap", "hotspots", "gender"],
           },
         },
       });
@@ -2380,67 +2368,6 @@ function AppContent() {
 
         if (!imageFound) {
           throw new Error("No image data found in response");
-        }
-
-        // 3. Generate Images for other timeline stages
-        for (let i = 0; i < data.timelineStages.length; i++) {
-          const stage = data.timelineStages[i];
-          
-          if (globalQuotaExceeded) {
-            // Use fallback immediately if we already know quota is gone
-            const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
-            setFutureSelf((prev) => {
-              if (!prev || !prev.timelineStages) return prev;
-              const updatedStages = [...prev.timelineStages];
-              updatedStages[i] = { ...updatedStages[i], imageUrl: stageFallbackUrl };
-              return { ...prev, timelineStages: updatedStages };
-            });
-            continue;
-          }
-
-          const stageImageParts: any[] = [
-            { text: `A high-fidelity, photorealistic digital avatar representing this future self at +${stage.years} years: ${stage.visualDescription}. Focus on advanced realistic facial features, age-appropriate skin texture, detailed eyes, and cinematic lighting. The style should be ${profile.style} that captures the essence of the person with extreme detail. Cinematic atmosphere, futuristic background, highly detailed.` }
-          ];
-          if (currentSelfie && currentSelfie.startsWith("data:")) {
-            const matches = currentSelfie.match(/^data:([^;]+);base64,(.+)$/);
-            if (matches && matches.length === 3) {
-              stageImageParts.push({
-                inlineData: {
-                  data: matches[2],
-                  mimeType: matches[1]
-                }
-              });
-            }
-          }
-
-          try {
-            // Significant delay between stage generations to respect free tier QPM
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            const stageImageResponse = await generateWithRetry(stageImageParts, `timeline stage ${i}`);
-
-            for (const part of stageImageResponse.candidates?.[0]?.content?.parts || []) {
-              if (part.inlineData) {
-                const stageImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-                setFutureSelf((prev) => {
-                  if (!prev || !prev.timelineStages) return prev;
-                  const updatedStages = [...prev.timelineStages];
-                  updatedStages[i] = { ...updatedStages[i], imageUrl: stageImageUrl };
-                  return { ...prev, timelineStages: updatedStages };
-                });
-                break;
-              }
-            }
-          } catch (err) {
-            console.warn(`Stage ${i} generation failed, using fallback:`, err);
-            const stageFallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(profile.name + i + "stage")}/1024/1024`;
-            setFutureSelf((prev) => {
-              if (!prev || !prev.timelineStages) return prev;
-              const updatedStages = [...prev.timelineStages];
-              updatedStages[i] = { ...updatedStages[i], imageUrl: stageFallbackUrl };
-              return { ...prev, timelineStages: updatedStages };
-            });
-          }
         }
       } catch (imageError) {
         console.error("Image generation failed:", imageError);
